@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+*.key
+
+# WorkBuddy — keep project memory and skills, drop local session state
+.workbuddy-ai/*
+!.workbuddy-ai/memory/
+!.workbuddy-ai/skills/

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RentMate — Implementation Methods &amp; Validation</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f0f2f6; --border:#e2e5ec;
+    --text:#141a24; --text-2:#4a5568; --text-3:#78839a;
+    --accent:#1f5fd6; --accent-soft:#e8f0fe;
+    --up:#c0392b; --up-soft:#fdecea;
+    --ok:#0f7b5f; --ok-soft:#e6f5f1;
+    --warn:#a35a00; --warn-soft:#fdf3e3;
+    --purple:#5b3bb5; --purple-soft:#efe9fb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.65;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1000px;margin:0 auto;padding:56px 28px 90px;}
+
+  header{border-bottom:2px solid var(--text);padding-bottom:26px;margin-bottom:14px;}
+  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:14px;}
+  h1{font-size:37px;line-height:1.18;margin:0 0 14px;letter-spacing:-.02em;font-weight:800;}
+  .sub{font-size:17px;color:var(--text-2);margin:0;max-width:800px;}
+  .meta{margin-top:20px;font-size:13px;color:var(--text-3);display:flex;gap:22px;flex-wrap:wrap;}
+
+  section{margin-top:52px;}
+  h2{font-size:23px;font-weight:750;margin:0 0 6px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px;}
+  h2 .num{font-size:13px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:3px 9px;letter-spacing:.04em;flex:none;}
+  h3{font-size:16.5px;font-weight:700;margin:30px 0 8px;}
+  h4{font-size:14px;font-weight:700;margin:20px 0 6px;color:var(--text-2);}
+  p{margin:0 0 14px;}
+  .lede{font-size:16px;color:var(--text-2);margin-bottom:22px;}
+
+  .callout{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;padding:18px 22px;margin:22px 0;}
+  .callout .label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--accent);margin-bottom:8px;}
+  .callout p:last-child{margin-bottom:0;}
+  .callout.danger{border-left-color:var(--up);} .callout.danger .label{color:var(--up);}
+  .callout.warn{border-left-color:var(--warn);} .callout.warn .label{color:var(--warn);}
+  .callout.good{border-left-color:var(--ok);} .callout.good .label{color:var(--ok);}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin:24px 0 10px;}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 18px 16px;}
+  .stat .val{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--accent);}
+  .stat .val.up{color:var(--up);} .stat .val.ok{color:var(--ok);}
+  .stat .k{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.45;}
+  .stat .src{font-size:11px;color:var(--text-3);margin-top:7px;}
+
+  .tbl-wrap{overflow-x:auto;margin:22px 0;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{background:var(--surface-2);text-align:left;padding:12px 16px;font-weight:750;font-size:12px;
+     letter-spacing:.05em;text-transform:uppercase;color:var(--text-2);border-bottom:1px solid var(--border);}
+  td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-2);}
+  tr:last-child td{border-bottom:none;}
+  td strong{color:var(--text);}
+  td.r{color:var(--up);font-weight:700;} td.g{color:var(--ok);font-weight:700;} td.w{color:var(--warn);font-weight:700;}
+
+  .pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+        padding:3px 8px;border-radius:5px;white-space:nowrap;}
+  .p-strong{background:var(--ok-soft);color:var(--ok);}
+  .p-mod{background:var(--warn-soft);color:var(--warn);}
+  .p-weak{background:var(--up-soft);color:var(--up);}
+  .p-none{background:#e9ecf2;color:var(--text-3);}
+
+  .method{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;margin:26px 0;overflow:hidden;}
+  .method .mhead{padding:22px 26px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--surface-2),var(--surface));}
+  .method .mtag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+                color:#fff;background:var(--accent);padding:3px 10px;border-radius:5px;margin-bottom:11px;}
+  .method.m2 .mtag{background:var(--purple);}
+  .method.m3 .mtag{background:var(--ok);}
+  .method h3{margin:0 0 6px;font-size:20px;letter-spacing:-.01em;}
+  .method .mcore{font-size:14.5px;color:var(--text-2);margin:0;}
+  .method .mbody{padding:22px 26px 24px;}
+  .method .mbody h4{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:22px 0 8px;}
+  .method.m2 .mbody h4{color:var(--purple);} .method.m3 .mbody h4{color:var(--ok);}
+  .method .mbody h4:first-child{margin-top:0;}
+  .method ul{margin:8px 0 0;padding-left:19px;font-size:14.5px;color:var(--text-2);}
+  .method li{margin-bottom:7px;}
+  .method p{font-size:14.5px;color:var(--text-2);}
+
+  .risk{background:var(--up-soft);border-radius:8px;padding:14px 18px;margin-top:16px;}
+  .risk .rl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--up);margin-bottom:6px;}
+  .risk ul{margin:0;padding-left:18px;} .risk li{margin-bottom:5px;font-size:14px;color:#7d2b20;}
+  .truth{background:var(--accent-soft);border-radius:8px;padding:14px 18px;margin-top:12px;}
+  .truth .rl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+  .truth ul{margin:0;padding-left:18px;} .truth li{margin-bottom:5px;font-size:14px;color:#1a4a9e;}
+
+  ol.ranked{list-style:none;counter-reset:r;padding:0;margin:20px 0;}
+  ol.ranked>li{counter-increment:r;position:relative;padding:18px 22px 18px 62px;background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;margin-bottom:12px;}
+  ol.ranked>li::before{content:counter(r);position:absolute;left:20px;top:18px;width:26px;height:26px;border-radius:7px;
+    background:var(--accent);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  ol.ranked>li .t{font-weight:750;font-size:15.5px;display:block;margin-bottom:5px;}
+  ol.ranked>li p{font-size:14.5px;color:var(--text-2);margin:0;}
+
+  hr.rule{border:none;border-top:1px solid var(--border);margin:44px 0;}
+  .sources{font-size:13px;color:var(--text-3);} .sources li{margin-bottom:7px;}
+  .sources a{color:var(--accent);text-decoration:none;} .sources a:hover{text-decoration:underline;}
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-3);}
+  .note{font-size:12.5px;color:var(--text-3);font-style:italic;margin-top:-6px;}
+  .bar{height:9px;border-radius:5px;background:var(--surface-2);overflow:hidden;margin-top:7px;}
+  .bar span{display:block;height:100%;background:var(--accent);border-radius:5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Implementation Strategy &amp; Idea Validation</div>
+  <h1>RentMate — Three Methods to Build It</h1>
+  <p class="sub">Three distinct implementation routes that each deliver all four proposed selling points, scored against the Opportunity Memo / PCV framework and stress-tested against the 41-response nomination survey, the RentMate project deck, and current Hong Kong market data.</p>
+  <div class="meta">
+    <span>September 2026</span>
+    <span>Evidence: n=41 survey · project deck · market research</span>
+    <span>PCV 18/24 — Strong</span>
+  </div>
+</header>
+
+<!-- ================= VERDICT ================= -->
+<section>
+  <h2><span class="num">01</span>Verdict at a Glance</h2>
+  <p class="lede">The opportunity is real and the timing is good, but the four selling points are <strong>not equally evidenced</strong>. Two are strongly supported by your own data; two have essentially zero direct validation. That asymmetry should drive which method you pick first — not the other way round.</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="val ok">18/24</div>
+      <div class="k">PCV score — top of the "Strong opportunity" band, one point below exceptional</div>
+      <div class="src">Hexa PCV framework</div>
+    </div>
+    <div class="stat">
+      <div class="val">73%</div>
+      <div class="k">Rated <em>verified profiles</em> a top-3 useful feature — the #1 answer of 12 options</div>
+      <div class="src">SURVEY Q11, n=41</div>
+    </div>
+    <div class="stat">
+      <div class="val">68%</div>
+      <div class="k">Rate trust verification (ID / background) as extremely important — only 2 of 41 rated it low</div>
+      <div class="src">SURVEY Q12, n=41</div>
+    </div>
+    <div class="stat">
+      <div class="val up">51%</div>
+      <div class="k">Currently live in a dormitory — so their reported housing pain is <em>anticipated</em>, not yet experienced</div>
+      <div class="src">SURVEY Q4, n=41</div>
+    </div>
+    <div class="stat">
+      <div class="val up">41%</div>
+      <div class="k">Name <em>privacy issues</em> as their top dissatisfaction with shared living — a structural headwind</div>
+      <div class="src">SURVEY Q9, n=41</div>
+    </div>
+    <div class="stat">
+      <div class="val">2 of 4</div>
+      <div class="k">Selling points with any direct survey evidence behind them</div>
+      <div class="src">Analysis</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="label">The headline judgement</div>
+    <p><strong>Build the trust and verification layer first, not the marketplace.</strong> Your strongest evidence — 73% want verified profiles, 68% want trust verification, and only 3 of 41 are comfortable with search apps as they exist — points at verification as the acute, universally-felt pain. Meanwhile the two selling points with no evidence (the AI guidebook and the complaints pipeline) are also the two that <em>depend on</em> trust being established first. Sequencing is the whole game here.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ================= EVIDENCE AUDIT ================= -->
+<section>
+  <h2><span class="num">02</span>Stress-Testing the Four Selling Points</h2>
+  <p class="lede">Before choosing a method, it is worth being honest about which of the four claims your own data actually supports. This is the part that most decks skip.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th style="width:22%">Selling point</th><th style="width:30%">Evidence for</th><th style="width:26%">Evidence against / gap</th><th style="width:22%">Verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1. Airbnb-style transparent listings with reviews</strong></td>
+          <td>Apartment searching picked by 24/41 (59%) as a top-3 feature. Market research confirms no way to verify size, condition or price fairness, and documents a fake-listing arms race.</td>
+          <td>Reviews only 16/41 (39%) as a top-3 feature. Q17: only 16 promoters vs 6 detractors on review importance — moderate. <strong>Reviews require completed tenancies you don't have yet.</strong></td>
+          <td><span class="pill p-mod">Moderate</span><br><span class="note">Listings yes; the review corpus is a cold-start problem, not a demand problem.</span></td>
+        </tr>
+        <tr>
+          <td><strong>2. Fast habits-based filtering of verified persons via student ID</strong></td>
+          <td><strong>Verified profiles 30/41 (73%) — #1 of 12 features. Compatibility matching 28/41 (68%) — #2.</strong> Q12: 28 promoters vs 2 detractors. Deck already specifies student-card OCR + university email.</td>
+          <td>Q15 (lifestyle-based suggestion) softer: 14 promoters, 18 passives, 9 detractors. Q10 shows low comfort with search apps (3 promoters, 15 detractors) — so the <em>framing</em> matters as much as the feature.</td>
+          <td><span class="pill p-strong">Strong</span><br><span class="note">Your best-evidenced claim by a wide margin. Lead with this.</span></td>
+        </tr>
+        <tr>
+          <td><strong>3. Gen-AI legal &amp; cultural guidebook + senior mentors + meetups</strong></td>
+          <td>Market research strongly grounds the <em>problem</em>: furnishing/deposit/disposal are the three most-litigated terms; 睇樓紙 double-commission traps; 46% of first-batch Top Talent Pass holders left, with adaptation difficulty cited.</td>
+          <td><strong>No survey question covers this at all.</strong> Adjacent free-text only: "chat feature", "roommate expectations". Nothing on mentors, meetups, or legal guidance.</td>
+          <td><span class="pill p-none">Unvalidated</span><br><span class="note">Well-reasoned from secondary data, but zero primary evidence. Needs its own interviews.</span></td>
+        </tr>
+        <tr>
+          <td><strong>4. Anonymised complaints to authorities or landlords</strong></td>
+          <td>Market research documents the disputes: deposit withholding, unlicensed bed-spaces, EAA complaint volume, police ADCC rental-fraud alerts, hotline 18222. Free-text asks for "scam filters" and "authenticity of users".</td>
+          <td><strong>No survey question covers this.</strong> More importantly, the design as stated has a logic problem — see the reframe below.</td>
+          <td><span class="pill p-weak">Unvalidated + design flaw</span><br><span class="note">Needs reframing before it can be a selling point.</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Three findings that should change your plan</h3>
+
+  <div class="callout danger">
+    <div class="label">Finding 1 — Your survey measures anticipated pain, not lived pain</div>
+    <p><strong>21 of 41 respondents currently live in a dormitory.</strong> That single fact reinterprets the whole dataset. Their answers about "struggles finding an apartment" (Q6) and "struggles finding a roommate" (Q7) are largely <em>prospective</em> — they are imagining the problem, not reporting it. The strongest signals in your survey (verified profiles 73%, trust verification 68%) are precisely the ones that <em>survive</em> this critique, because they are about fear and risk, which people can assess without experience. The softer signals — shared expenses (27 detractors = low stress), giving up a location (28 detractors = rarely happened), task tracking (11/19/11) — are the ones most likely to be noise. <strong>Interpret Q6–Q9 and Q14–Q18 with heavy caution; weight Q11–Q13 heavily.</strong></p>
+  </div>
+
+  <div class="callout danger">
+    <div class="label">Finding 2 — Privacy is the #1 dissatisfaction, and it cuts against your core product</div>
+    <p>Q9 ranks <strong>privacy issues first (17 of 41)</strong>, ahead of finding a suitable roommate (12), rent being too high (11), and finding a suitable flat (9). This is the most under-discussed result in the deck. Your product is a <em>shared-living</em> product, but the single biggest complaint about shared living is having no privacy. That does not kill the idea — but it means the winning positioning is <strong>"find the least-bad flatmate fast, and get your own space"</strong>, not "community living". It also elevates the importance of Selling Point 1's transparency: a listing that honestly shows room size and layout directly addresses a privacy complaint. And it argues for filtering on <em>personal space preferences</em>, not just sociability.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="label">Finding 3 — Selling point 4 as written is self-defeating</div>
+    <p><strong>"Send your anonymised complaint to your landlord"</strong> cannot work: your landlord knows exactly who you are, and anonymity removes the leverage that makes a complaint credible. <strong>"Anonymously to authorities"</strong> mostly fails too — enforcement action (EAA, Police, Lands Tribunal) needs an identified complainant, evidence, and a paper trail.</p>
+    <p>There are two reframes that <em>do</em> work, and both are stronger products:</p>
+    <p style="margin-bottom:0">① <strong>Aggregate pattern intelligence</strong> — anonymise across many tenants to surface "this agency has 7 unresolved deposit disputes" or "this building has 3 unlicensed-bed-space reports". That is genuinely new information no individual can produce, and it powers a public risk score.<br>
+    ② <strong>Templated escalation, not anonymous submission</strong> — generate the correctly-cited, correctly-addressed complaint letter or EAA/18222 filing for the tenant to send <em>under their own name</em>, with the evidence assembled for them. You remove the effort and the legal ignorance, not the identity.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ================= PCV ================= -->
+<section>
+  <h2><span class="num">03</span>Validation Scorecard</h2>
+
+  <h3>Problem Assessment Matrix</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Dimension</th><th>Rating</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Frequency</strong></td><td><span class="pill p-strong">High</span></td><td>Search recurs each semester or academic year; and once mismatched, the pain is experienced daily for months.</td></tr>
+        <tr><td><strong>Severity</strong></td><td><span class="pill p-strong">High</span></td><td>Deck cites ~70% of exchange students naming housing their biggest stressor. Financial exposure: HK$5,000–10,000 agent fee, plus 2 months' deposit + 1 month advance (~HK$65,000–75,000 on an HK$18k flat). Scam risk is both financial and physical-safety.</td></tr>
+        <tr><td><strong>Awareness</strong></td><td><span class="pill p-strong">High</span></td><td>Actively seeking. Students post daily in Facebook groups, r/HongKong and r/HKU; the deck notes "I found a flat but need a roommate" is the most common post in housing groups.</td></tr>
+        <tr><td><strong>Budget</strong></td><td><span class="pill p-mod">Medium-High</span></td><td>Money exists and is already being spent — but it flows to agents today. Willingness to pay <em>a platform</em> is unproven, and students are price-sensitive. Best captured by displacing the agent fee rather than adding a subscription.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Problem Score: 3 High of 4 → <strong>Strong problem.</strong></p>
+
+  <h3>PCV Score Breakdown</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Dimension</th><th>Current solution problem</th><th>Pts</th><th>Your improvement</th><th>Pts</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Price</strong></td><td>Serious — one month's rent as agent fee (HK$5,000–10,000) for near-zero value to a student</td><td class="r">3</td><td>Some — removes the fee if owner-direct supply materialises, but does not touch rent itself and depends on supply-side adoption</td><td>1</td></tr>
+        <tr><td><strong>Quality</strong></td><td>Serious — unverifiable listings, no trust signals, documented scam density, rooms half the advertised size</td><td class="r">3</td><td>Serious — student-ID verification, review corpus, AI scam detection and price-fairness checking</td><td class="g">3</td></tr>
+        <tr><td><strong>Performance</strong></td><td>A problem — weeks of searching, agent-dependent, chaotic group threads</td><td>1</td><td>Some — filters and matching compress the search toward days, but liquidity gates the outcome</td><td>1</td></tr>
+        <tr><td><strong>Convenience</strong></td><td>Serious — housing and roommates solved on separate platforms, "never both together"; fragmented across 28Hse, Nestia, Facebook</td><td class="r">3</td><td>Serious — one surface for listings, matching, guidance and escalation</td><td class="g">3</td></tr>
+        <tr><td colspan="2"><strong>Subtotal</strong></td><td class="r"><strong>10/12</strong></td><td><strong>Subtotal</strong></td><td class="g"><strong>8/12</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout good">
+    <div class="label">Total PCV: 18/24 — Strong opportunity, worth pursuing</div>
+    <p>Comfortably inside the "Strong" band and one point short of "Exceptional". The two points you are leaving on the table are both in <strong>Price</strong> and <strong>Performance</strong> — and both are gated by the same thing: <em>supply-side liquidity</em>. That is not a product flaw, it is a go-to-market problem. Which is exactly why the choice of implementation method matters more than the feature list.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ================= THREE METHODS ================= -->
+<section>
+  <h2><span class="num">04</span>The Three Implementation Methods</h2>
+  <p class="lede">Each method is a complete route to all four selling points. They differ in <em>where you start</em>, which determines your cold-start problem, your cost structure, and your moat.</p>
+
+  <!-- METHOD 1 -->
+  <div class="method m1">
+    <div class="mhead">
+      <span class="mtag">Method 1</span>
+      <h3>Trust Utility First — "Shield"</h3>
+      <p class="mcore">Launch as a free verification and scam-detection tool, not a marketplace. Accumulate the review and risk corpus as a by-product, then convert attention into transactions.</p>
+    </div>
+    <div class="mbody">
+      <h4>Mechanism</h4>
+      <p>A student uploads a listing photo, screenshot or link. The system returns a risk score, an estimated real room size from the photo, a price-fairness comparison against RVD rental data, and specific flags for known scam patterns (owner "abroad", deposit-before-viewing, forged authorisation). Student-ID verification unlocks the tool. Reviews and landlord histories attach to listings and accumulate over time. A Gen-AI guidebook sits behind the same login, so legal and cultural questions are answered in the moment of maximum relevance — while the student is actually evaluating a listing.</p>
+
+      <h4>How it delivers each selling point</h4>
+      <ul>
+        <li><strong>SP1 — Transparent listings + reviews:</strong> the scanner <em>creates</em> transparency by extracting what the listing hides, before you have any inventory of your own. Reviews seed from verified users who report outcomes.</li>
+        <li><strong>SP2 — Verified persons via student ID:</strong> verification is the entry gate to the whole product, so it is adopted at maximum rate rather than being an optional badge.</li>
+        <li><strong>SP3 — Gen-AI guidebook:</strong> delivered at the exact decision moment. "Should I pay this deposit?" is when a guidebook is read; a standalone guidebook is not.</li>
+        <li><strong>SP4 — Complaints:</strong> the aggregate-pattern reframe fits naturally — every scanned listing feeds a shared risk database, so repeat-offender agencies and buildings surface without any individual needing to identify themselves.</li>
+      </ul>
+
+      <h4>Why this is the strongest first move</h4>
+      <p>It is the only method with <strong>no cold-start problem</strong>. A marketplace needs both sides simultaneously; a utility needs only one user and delivers value on the first use. It also directly targets your strongest evidence — 68% rating trust verification extremely important, with only 2 of 41 rating it low, is the most lopsided result in the entire survey. And critically, it sidesteps the finding that only 3 of 41 are comfortable using search apps: a <em>tool that answers a question</em> faces far less adoption resistance than <em>an app that asks you to browse</em>. Finally, it builds the two assets that make later methods work — a verified user base and a review corpus — without paying to acquire either.</p>
+
+      <div class="risk">
+        <div class="rl">Risks</div>
+        <ul>
+          <li><strong>No revenue model on day one.</strong> A free utility must convert to transactions before runway runs out. Mitigate by charging landlords/operators for verified-tenant access, not students.</li>
+          <li><strong>Review corpus stalls.</strong> Reviews need completed tenancies; you may operate for a year with thin review data. Mitigate by starting with listing-level and agency-level reviews (which need only an interaction, not a full tenancy).</li>
+          <li><strong>Vision-model accuracy risk.</strong> A size estimate that is confidently wrong destroys the trust you are selling. Ship with explicit confidence intervals and never present an estimate as a measurement.</li>
+        </ul>
+      </div>
+
+      <div class="truth">
+        <div class="rl">Must be true for this to work</div>
+        <ul>
+          <li>Students will upload a listing to a stranger's tool before they trust the listing.</li>
+          <li>Photo-based size estimation is accurate enough to be useful with honest confidence scoring.</li>
+          <li>Landlords or operators will pay for verified-tenant access (the only viable revenue path).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- METHOD 2 -->
+  <div class="method m2">
+    <div class="mhead">
+      <span class="mtag">Method 2</span>
+      <h3>Campus Rail — Institutional Wedge</h3>
+      <p class="mcore">Sign one university. Let the institution's own identity system be your verification rail and its arrival process be your distribution channel.</p>
+    </div>
+    <div class="mbody">
+      <h4>Mechanism</h4>
+      <p>Partner with a single university's student housing or international office under an MOU. Student ID plus university email becomes the verification standard — cheap, instant and institutionally vouched. Supply is built as a curated panel of verified landlords, operators and existing students with spare rooms in that campus catchment. The Gen-AI guidebook is seeded with that university's actual procedures, and senior students from that same campus run the meetups. Complaints route into the university's existing escalation path alongside EAA and police channels.</p>
+
+      <h4>How it delivers each selling point</h4>
+      <ul>
+        <li><strong>SP1 — Transparent listings + reviews:</strong> a bounded geography means every listing can be physically inspected once by your team, making full transparency achievable rather than aspirational. Reviews start dense because the user base is dense.</li>
+        <li><strong>SP2 — Verified persons via student ID:</strong> verification is strongest here — the university already knows who these people are. This is the only method where student-ID verification is genuinely authoritative rather than self-declared.</li>
+        <li><strong>SP3 — Gen-AI guidebook + seniors + meetups:</strong> this is the method that makes SP3 economically viable. A mentor programme and physical meetups need a geographically concentrated cohort; you cannot run them across a scattered user base.</li>
+        <li><strong>SP4 — Complaints:</strong> the university is a credible intermediary with real leverage over landlords in its own catchment, and an existing duty of care to its students.</li>
+      </ul>
+
+      <h4>Why this is the strongest route to defensibility</h4>
+      <p>It solves the two problems that kill most marketplace attempts: <strong>liquidity and trust</strong>. A single campus gives you a dense, homogeneous, already-verifiable population — the cheapest possible path to the critical mass that Method 1's marketplace layer will eventually need. Your own deck identifies university housing offices as secondary users needing "better tools for incoming students", and market research shows the Development Bureau is actively inviting student-accommodation proposals. Distribution comes essentially free through the arrival pack every international student already receives. It also converts your weakest selling point (SP3) into a genuine differentiator, because mentors and meetups are only feasible with a concentrated cohort.</p>
+
+      <div class="risk">
+        <div class="rl">Risks</div>
+        <ul>
+          <li><strong>Slow institutional sales.</strong> University procurement and MOU cycles can take 6–12 months. Mitigate by starting with a student society or housing office pilot rather than a formal institutional contract.</li>
+          <li><strong>Single-campus ceiling.</strong> The model proves out at one campus but each new campus is a fresh sales cycle. Mitigate by treating campus one as a referenceable template.</li>
+          <li><strong>Political and data-protection exposure.</strong> Handling student IDs and institutional data brings PDPO obligations and reputational risk to the partner. Mitigate by storing verification as a boolean attestation, never the document itself.</li>
+        </ul>
+      </div>
+
+      <div class="truth">
+        <div class="rl">Must be true for this to work</div>
+        <ul>
+          <li>At least one university will engage within one semester.</li>
+          <li>Enough verified landlords will list for the campus catchment to give real choice.</li>
+          <li>Students will use a university-endorsed channel rather than the Facebook groups they already trust.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- METHOD 3 -->
+  <div class="method m3">
+    <div class="mhead">
+      <span class="mtag">Method 3</span>
+      <h3>Operator Hybrid — Own the Last Mile</h3>
+      <p class="mcore">Don't only match digitally — operate the accommodation. Control the tenancy, and the transparency, reviews, community and dispute resolution all become first-party.</p>
+    </div>
+    <div class="mbody">
+      <h4>Mechanism</h4>
+      <p>Take control of a small portfolio of beds — either by converting commercial or hotel space under the Hostels in the City Scheme, or by partnering with an existing co-living operator — and run the platform on top of it. Listings are your own units, so they are fully transparent by construction and verified to a known standard. Tenants are verified by student ID. Senior-mentor meetups become a managed service rather than a hope. Complaints are handled by an in-house resolution desk with anonymised aggregate escalation to the relevant authority.</p>
+
+      <h4>How it delivers each selling point</h4>
+      <ul>
+        <li><strong>SP1 — Transparent listings + reviews:</strong> maximally credible. You can guarantee the room matches the listing because you control the room. Reviews are high-quality because you know the tenancy actually happened.</li>
+        <li><strong>SP2 — Verified persons via student ID:</strong> verification is a condition of the tenancy, so it is universal by default.</li>
+        <li><strong>SP3 — Gen-AI guidebook + seniors + meetups:</strong> the community layer is delivered as part of the product rather than as a marketing cost. This is the only method where SP3 has a natural home and a budget line.</li>
+        <li><strong>SP4 — Complaints:</strong> structurally credible for the first time. You cannot credibly escalate to landlords you have no relationship with; as an operator, you <em>are</em> the landlord, and disputes become an internal process with a real incentive to resolve.</li>
+      </ul>
+
+      <h4>Why this is the strongest moat</h4>
+      <p>Market research is explicit that student housing is <strong>"a managed living environment, not just real estate"</strong>, requiring discipline in security, maintenance, rent transparency, resident support and grievance handling — capabilities most small landlords lack. That gap is the opportunity. This method captures the margin agents currently take, and it converts the single largest structural market fact — a <strong>120,000-bed shortfall by 2028</strong> with policy actively inviting conversion — into supply. It is also the only method that makes Selling Point 4 structurally coherent rather than aspirational. Software features are copyable in weeks; operated beds with a community and a service reputation are not.</p>
+
+      <div class="risk">
+        <div class="rl">Risks</div>
+        <ul>
+          <li><strong>Capital intensity.</strong> This is a property business with a software front-end, not a software business. Conversion, fit-out and working capital are all real.</li>
+          <li><strong>Regulatory lock-in.</strong> Under the Hostels in the City Scheme: a 48-month building covenant, a non-alienation clause barring strata-title sales, six months' notice to exit, and a buyer committed to continued hostel use. This is illiquid capital.</li>
+          <li><strong>Operational drag.</strong> It does not scale like software, and margin depends on occupancy. A single bad cohort hurts twice — revenue and reputation.</li>
+          <li><strong>Capability mismatch.</strong> Most student teams cannot execute property conversion. This is the method most likely to be beyond reach in a hackathon timeframe.</li>
+        </ul>
+      </div>
+
+      <div class="truth">
+        <div class="rl">Must be true for this to work</div>
+        <ul>
+          <li>You can secure either a conversion site or a willing operator partner.</li>
+          <li>Occupancy can be sustained above the break-even threshold through the low season.</li>
+          <li>The team has, or can hire, genuine property-operations capability.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ================= COMPARISON ================= -->
+<section>
+  <h2><span class="num">05</span>Method Comparison and Recommended Sequence</h2>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>1 · Trust Utility</th><th>2 · Campus Rail</th><th>3 · Operator Hybrid</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Cold-start problem</strong></td><td class="g">None — works with one user</td><td class="w">Moderate — needs one campus's density</td><td class="r">Severe — needs capital and occupancy</td></tr>
+        <tr><td><strong>Time to first user value</strong></td><td class="g">Same day</td><td class="w">One semester</td><td class="r">6–18 months</td></tr>
+        <tr><td><strong>SP1 listings</strong></td><td class="w">Derived from others' listings</td><td class="g">Curated, inspectable</td><td class="g">First-party, guaranteed</td></tr>
+        <tr><td><strong>SP2 student-ID verification</strong></td><td class="w">Self-declared</td><td class="g">Institutionally authoritative</td><td class="g">Condition of tenancy</td></tr>
+        <tr><td><strong>SP3 guidebook + mentors + meetups</strong></td><td class="w">Guidebook only, no community</td><td class="g">Fully feasible</td><td class="g">Native and funded</td></tr>
+        <tr><td><strong>SP4 complaints</strong></td><td class="w">Aggregate patterns only</td><td class="g">Credible intermediary</td><td class="g">First-party resolution</td></tr>
+        <tr><td><strong>Evidence strength</strong></td><td class="g">Strongest (68% / 73%)</td><td class="w">Moderate (59% / 73%)</td><td class="r">Untested</td></tr>
+        <tr><td><strong>Capital need</strong></td><td class="g">Low</td><td class="w">Medium</td><td class="r">High</td></tr>
+        <tr><td><strong>Defensibility</strong></td><td class="r">Low — copyable</td><td class="w">Medium — relationships</td><td class="g">High — physical + service</td></tr>
+        <tr><td><strong>Revenue path</strong></td><td class="w">Landlord/operator subscriptions</td><td class="g">Placement fees, university contracts</td><td class="g">Rent margin</td></tr>
+        <tr><td><strong>Fit for a hackathon</strong></td><td class="g">Yes — demoable in a day</td><td class="w">Partly — needs a partner letter</td><td class="r">No — narrative only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Recommended sequence</h3>
+  <p>These are not mutually exclusive — they are stages, and the order matters because each one builds the asset the next one needs.</p>
+
+  <ol class="ranked">
+    <li>
+      <span class="t">Stage 1 — Ship Method 1 as the wedge (now, to ~3 months)</span>
+      <p>Build the listing scanner, price-fairness check and Gen-AI guidebook as a free tool. This requires no supply, no capital and no institutional partner, and it speaks directly to your strongest evidence. Its job is to acquire verified students and start accumulating listing and agency risk data. It also produces the demo you need immediately.</p>
+    </li>
+    <li>
+      <span class="t">Stage 2 — Convert density via Method 2 (3–9 months)</span>
+      <p>Take the verified user base from Stage 1 to one university and propose the campus rail. You now arrive with data — how many of their students used the tool, what scams they encountered — which is far more persuasive than a cold pitch. This unlocks authoritative student-ID verification, curated supply, and the mentor/meetup layer that Selling Point 3 needs.</p>
+    </li>
+    <li>
+      <span class="t">Stage 3 — Build the moat with Method 3 (9 months+, only if warranted)</span>
+      <p>With proven demand and campus relationships, pursue operated beds via the Hostels in the City Scheme or an operator partnership. Only at this stage does Selling Point 4 become structurally credible, and only here do you capture rent margin rather than referral fees. Treat this as a strategic option, not a plan — it requires capital and capability the team may not have.</p>
+    </li>
+  </ol>
+
+  <div class="callout good">
+    <div class="label">If you only do one thing</div>
+    <p>Ship the <strong>listing scanner plus Gen-AI guidebook as a single free tool</strong>, gated behind student-ID verification. It is the smallest build that touches Selling Points 1, 2 and 3, it requires nothing you don't already have, and it directly attacks the only result in your survey that is near-unanimous: students want to know whether a listing and a person are real.</p>
+  </div>
+</section>
+
+<!-- ================= NEXT STEPS ================= -->
+<section>
+  <h2><span class="num">06</span>What to Validate Next</h2>
+  <p class="lede">The PCV score is strong but the evidence base has a specific, fixable hole. Your survey validated the <em>what</em> (features) but not the <em>why</em> (motivations), and it left two selling points completely untested.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Priority</th><th>Action</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-strong">P0</span></td><td>Run 20 <strong>open-ended interviews</strong>, not a survey — and deliberately recruit students who have <em>already left the dormitory and searched the market</em>.</td><td>Your current sample is 51% dormitory-dwelling, so it reports anticipated pain. Interviewing post-search students converts speculation into evidence, and it is the only way to test the privacy finding properly.</td></tr>
+        <tr><td><span class="pill p-strong">P0</span></td><td>Test Selling Point 3 directly: would a student actually attend a mentor meetup, and would they read a guidebook before or after getting burned?</td><td>It has zero evidence behind it and it is the selling point most dependent on Method 2 or 3. If students won't show up, SP3 is a feature, not a selling point.</td></tr>
+        <tr><td><span class="pill p-warn">P1</span></td><td>Test the reframed Selling Point 4 with 5 students who have had a deposit dispute. Ask what they actually did, and whether aggregate risk data would have changed their decision.</td><td>As written, SP4 has a logic flaw. The aggregate-intelligence reframe needs validating before it goes on a pitch slide.</td></tr>
+        <tr><td><span class="pill p-warn">P1</span></td><td>Get 3–5 design partners: one university housing contact, one landlord or operator, and three students who will test early builds.</td><td>Per the framework, 3–5 committed design partners is the threshold for proceeding. You currently have survey respondents, not partners.</td></tr>
+        <tr><td><span class="pill p-mod">P2</span></td><td>Validate the revenue path with 5 landlords or operators — will they pay for verified-tenant access?</td><td>Price scored only 1/3 on improvement precisely because the revenue model is unresolved. This is the weakest dimension in your PCV score.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="label">Kill criteria — decide these now, before you're invested</div>
+    <p>Be explicit about what would make you stop, so sunk cost doesn't decide for you:</p>
+    <p style="margin-bottom:0">
+    <strong>·</strong> Fewer than 8 of 20 interviews describe the verification/transparency problem as acute → the core thesis is wrong, pivot.<br>
+    <strong>·</strong> Fewer than 2 of 5 landlords would pay for verified-tenant access → no revenue path, the utility cannot survive.<br>
+    <strong>·</strong> Students consistently prefer the Facebook groups they already use despite knowing the risks → the trust gap is not painful enough to change behaviour.<br>
+    <strong>·</strong> Fewer than 5 of 20 would attend a mentor meetup → drop SP3 from the pitch rather than carrying a claim you cannot defend.
+    </p>
+  </div>
+</section>
+
+<!-- ================= LIMITATIONS ================= -->
+<section>
+  <h2><span class="num">07</span>Limitations of This Analysis</h2>
+  <div class="callout">
+    <p><strong>Sample.</strong> n=41, from a single "Nomination Survey" run on 20 September 2026. 88% are aged 18–25 and 59% are international university students — a narrow, self-selected slice. It is not generalisable to the wider Hong Kong rental market, and the framework's own guidance treats surveys as weak validation compared with conversation.</p>
+    <p><strong>Question-type ambiguity.</strong> Several results are reported as Promoters/Passives/Detractors aggregates. For binary-intent questions — Q6, Q7, Q16 ("have you ever…") — the direction of the scale is ambiguous, so those figures should be read as directional only. Q11–Q13 (multi-select and free-text) are unambiguous and are weighted accordingly above.</p>
+    <p><strong>Prospective versus experienced pain.</strong> As set out in Finding 1, over half the sample has not yet faced the open market. This is the single largest limitation and the reason P0 above is an interview programme rather than more survey work.</p>
+    <p><strong>Unvalidated market claims.</strong> The deck's "70% of exchange students report housing as their biggest stressor" is flagged in the deck itself as anecdotal. It is used here as directional context, not as evidence.</p>
+    <p style="margin-bottom:0"><strong>Scoring subjectivity.</strong> PCV ratings are judgement calls. The 18/24 total is robust to reasonable disagreement — moving any single dimension by one band shifts the result by 2 points and keeps it inside the "Strong" band — but it is a structured opinion, not a measurement.</p>
+  </div>
+</section>
+
+<!-- ================= SOURCES ================= -->
+<section>
+  <h2><span class="num">08</span>Sources</h2>
+  <ol class="sources">
+    <li><strong>SURVEY.pdf</strong> — RentMate nomination survey, 41 responses, 20 September 2026 (Q1–Q18).</li>
+    <li><strong>GenAI.pdf</strong> — RentMate project overview: problem breakdown, target users, market data, three solution approaches, AI components, scope control, lifestyle/housing/budget quiz specification.</li>
+    <li><strong>hk-rental-partner-research.html</strong> — Hong Kong rental market research briefing, September 2026 (rent index 207.4; 120,000-bed shortfall; 46% talent non-renewal; agent commission and 睇樓紙; fraud typologies; Hostels in the City Scheme terms).</li>
+    <li>Hexa Opportunity Memo / Perceived Created Value (PCV) methodology — via the <code>idea-validator</code> skill.</li>
+  </ol>
+</section>
+
+<footer>
+  Prepared September 2026. The PCV score is a structured judgement based on the evidence available, not a measurement. Two of the four selling points assessed here have no primary validation — treat them as hypotheses to test, not established facts. Nothing in this document is legal advice; the guidebook and complaints features described would both require qualified Hong Kong legal review before launch.
+</footer>
+
+</div>
+</body>
+</html>

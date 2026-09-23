@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RentMate — Scope Lock &amp; Judging Alignment</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f0f2f6; --border:#e2e5ec;
+    --text:#141a24; --text-2:#4a5568; --text-3:#78839a;
+    --accent:#1f5fd6; --accent-soft:#e8f0fe;
+    --up:#c0392b; --up-soft:#fdecea;
+    --ok:#0f7b5f; --ok-soft:#e6f5f1;
+    --warn:#a35a00; --warn-soft:#fdf3e3;
+    --purple:#5b3bb5; --purple-soft:#efe9fb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.65;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1000px;margin:0 auto;padding:56px 28px 90px;}
+
+  header{border-bottom:2px solid var(--text);padding-bottom:26px;margin-bottom:14px;}
+  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:14px;}
+  h1{font-size:37px;line-height:1.18;margin:0 0 14px;letter-spacing:-.02em;font-weight:800;}
+  .sub{font-size:17px;color:var(--text-2);margin:0;max-width:800px;}
+  .meta{margin-top:20px;font-size:13px;color:var(--text-3);display:flex;gap:22px;flex-wrap:wrap;}
+
+  section{margin-top:52px;}
+  h2{font-size:23px;font-weight:750;margin:0 0 6px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px;}
+  h2 .num{font-size:13px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:3px 9px;letter-spacing:.04em;flex:none;}
+  h3{font-size:16.5px;font-weight:700;margin:30px 0 8px;}
+  h4{font-size:14px;font-weight:700;margin:20px 0 6px;color:var(--text-2);}
+  p{margin:0 0 14px;}
+  .lede{font-size:16px;color:var(--text-2);margin-bottom:22px;}
+
+  .callout{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;padding:18px 22px;margin:22px 0;}
+  .callout .label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--accent);margin-bottom:8px;}
+  .callout p:last-child{margin-bottom:0;}
+  .callout.danger{border-left-color:var(--up);} .callout.danger .label{color:var(--up);}
+  .callout.warn{border-left-color:var(--warn);} .callout.warn .label{color:var(--warn);}
+  .callout.good{border-left-color:var(--ok);} .callout.good .label{color:var(--ok);}
+  .callout.purple{border-left-color:var(--purple);} .callout.purple .label{color:var(--purple);}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin:24px 0 10px;}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 18px 16px;}
+  .stat .val{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--accent);}
+  .stat .val.up{color:var(--up);} .stat .val.ok{color:var(--ok);} .stat .val.warn{color:var(--warn);}
+  .stat .k{font-size:12.5px;color:var(--text-2);margin-top:7px;line-height:1.45;}
+  .stat .src{font-size:11px;color:var(--text-3);margin-top:7px;}
+
+  .tbl-wrap{overflow-x:auto;margin:22px 0;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{background:var(--surface-2);text-align:left;padding:12px 16px;font-weight:750;font-size:12px;
+     letter-spacing:.05em;text-transform:uppercase;color:var(--text-2);border-bottom:1px solid var(--border);}
+  td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-2);}
+  tr:last-child td{border-bottom:none;}
+  td strong{color:var(--text);}
+  td.r{color:var(--up);font-weight:700;} td.g{color:var(--ok);font-weight:700;} td.w{color:var(--warn);font-weight:700;}
+
+  .pill{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+        padding:3px 8px;border-radius:5px;white-space:nowrap;}
+  .p-strong{background:var(--ok-soft);color:var(--ok);}
+  .p-mod{background:var(--warn-soft);color:var(--warn);}
+  .p-weak{background:var(--up-soft);color:var(--up);}
+  .p-none{background:#e9ecf2;color:var(--text-3);}
+  .p-purple{background:var(--purple-soft);color:var(--purple);}
+
+  .tension{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;margin:24px 0;overflow:hidden;}
+  .tension .thead{padding:20px 26px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--surface-2),var(--surface));}
+  .tension .ttag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+                color:#fff;background:var(--up);padding:3px 10px;border-radius:5px;margin-bottom:11px;}
+  .tension.t2 .ttag{background:var(--warn);} .tension.t3 .ttag{background:var(--purple);}
+  .tension h3{margin:0;font-size:19px;letter-spacing:-.01em;}
+  .tension .tbody{padding:22px 26px 24px;}
+  .tension .tbody h4{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:20px 0 8px;}
+  .tension .tbody h4:first-child{margin-top:0;}
+  .tension p{font-size:14.5px;color:var(--text-2);}
+  .tension ul{margin:8px 0 0;padding-left:19px;font-size:14.5px;color:var(--text-2);}
+  .tension li{margin-bottom:6px;}
+  .resolve{background:var(--ok-soft);border-radius:8px;padding:15px 19px;margin-top:16px;}
+  .resolve .rl{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ok);margin-bottom:7px;}
+  .resolve p{margin:0;font-size:14.5px;color:#0b5a45;}
+
+  ol.ranked{list-style:none;counter-reset:r;padding:0;margin:20px 0;}
+  ol.ranked>li{counter-increment:r;position:relative;padding:18px 22px 18px 62px;background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;margin-bottom:12px;}
+  ol.ranked>li::before{content:counter(r);position:absolute;left:20px;top:18px;width:26px;height:26px;border-radius:7px;
+    background:var(--accent);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  ol.ranked>li .t{font-weight:750;font-size:15.5px;display:block;margin-bottom:5px;}
+  ol.ranked>li p{font-size:14.5px;color:var(--text-2);margin:0;}
+
+  ul.check{list-style:none;padding:0;margin:16px 0;}
+  ul.check li{position:relative;padding:11px 0 11px 30px;border-bottom:1px solid var(--border);font-size:14.5px;color:var(--text-2);}
+  ul.check li:last-child{border-bottom:none;}
+  ul.check li::before{content:"";position:absolute;left:6px;top:18px;width:9px;height:9px;border-radius:50%;background:var(--accent);}
+  ul.check li.no::before{background:var(--up);}
+  ul.check li.ok::before{background:var(--ok);}
+  ul.check strong{color:var(--text);}
+
+  hr.rule{border:none;border-top:1px solid var(--border);margin:44px 0;}
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-3);}
+  .note{font-size:12.5px;color:var(--text-3);font-style:italic;margin-top:-6px;}
+  code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Hackathon Scope Lock &amp; Judging Alignment</div>
+  <h1>RentMate — What to Build in Four Weeks</h1>
+  <p class="sub">A critique of your refined design against the five judging criteria. Your team made several genuinely strong calls — and three of the five criteria are currently the weakest part of the plan. This document is about fixing those three.</p>
+  <div class="meta">
+    <span>23 September 2026</span>
+    <span>4-week build window</span>
+    <span>Track 3 · Smart Living, Culture &amp; Belonging · SDG 11</span>
+  </div>
+</header>
+
+<!-- ============ BOTTOM LINE ============ -->
+<section>
+  <h2><span class="num">01</span>The Bottom Line</h2>
+  <p class="lede">Your problem framing and your ethics instincts are strong. Your prototype scope and your GenAI story are not. Since those are two of the five criteria, they deserve most of your remaining attention.</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="val ok">Strong</div>
+      <div class="k">Convincing framing of the problem — you have real primary data and market evidence</div>
+      <div class="src">Criterion 1</div>
+    </div>
+    <div class="stat">
+      <div class="val up">At risk</div>
+      <div class="k">Prototype/demo — your 6-step flow is roughly 3 products in 4 weeks</div>
+      <div class="src">Criterion 2</div>
+    </div>
+    <div class="stat">
+      <div class="val up">At risk</div>
+      <div class="k">GenAI component — your matching engine is arithmetic, and judges may say so</div>
+      <div class="src">Criterion 3</div>
+    </div>
+    <div class="stat">
+      <div class="val warn">Mixed</div>
+      <div class="k">Feasibility &amp; impact — impact story strong, feasibility needs the scope cut</div>
+      <div class="src">Criterion 4</div>
+    </div>
+    <div class="stat">
+      <div class="val warn">Mixed</div>
+      <div class="k">Sustainability &amp; ethics — good instincts, four unaddressed gaps</div>
+      <div class="src">Criterion 5</div>
+    </div>
+    <div class="stat">
+      <div class="val">18/24</div>
+      <div class="k">PCV score unchanged — your refinements sharpen the solution, not the problem</div>
+      <div class="src">Hexa PCV</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="label">The single most important change</div>
+    <p><strong>Stop positioning RentMate as a roommate-matching app. Position it as verified trust infrastructure, delivered through matching.</strong> Your own survey is unambiguous about what people want: verified profiles 73%, trust verification 68% with only 2 of 41 rating it low. "Roommate compatibility" is how you deliver that trust — it is not what you are selling. This reframe fixes your differentiation problem, your GenAI problem, and your judging narrative at the same time.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ WHAT YOU GOT RIGHT ============ -->
+<section>
+  <h2><span class="num">02</span>What Your Team Got Right</h2>
+  <p class="lede">Worth stating explicitly, because these are real strategic wins that most hackathon teams miss.</p>
+
+  <ul class="check">
+    <li class="ok"><strong>Reporting for roommates, reviews for flats and districts.</strong> This is the best decision in your design and you may not realise why. A public, permanent reputation score on <em>people</em> is defamation-adjacent, retaliatory, and impossible to appeal fairly. Reviews on <em>properties</em> are standard consumer protection. Splitting them this way is exactly the right ethical line — say so in your pitch, because judges on the ethics criterion will notice.</li>
+    <li class="ok"><strong>Video call unlocked only after matching.</strong> This is a safety gate, not a feature. It means no stranger can initiate a video call with a student. Lead with this when you discuss safety.</li>
+    <li class="ok"><strong>Choosing the crowded-market escape correctly.</strong> Your read that pure listings is a saturated space (28Hse, Nestia, Squarefoot, House730, Spacious) is right, and your instinct to not fight there is correct.</li>
+    <li class="ok"><strong>Prioritising transparency over cost.</strong> You lead with poor data transparency rather than the HK$5,000 agency fee. That is the stronger argument, because cost is a one-off and opacity is a systemic harm that also creates fraud exposure.</li>
+    <li class="ok"><strong>The regulator-data insight.</strong> Recognising that your aggregate data is independently valuable is genuinely strategic — it gives you a systemic impact story that individual-user products cannot tell.</li>
+  </ul>
+</section>
+
+<hr class="rule">
+
+<!-- ============ TENSIONS ============ -->
+<section>
+  <h2><span class="num">03</span>Three Tensions You Have Not Resolved</h2>
+
+  <div class="tension">
+    <div class="thead">
+      <span class="ttag">Tension 1</span>
+      <h3>Privacy-first priority vs. a social hangout feature</h3>
+    </div>
+    <div class="tbody">
+      <p>You list safety and privacy as priority #1. Your own survey independently confirms it: <strong>privacy issues are the #1 dissatisfaction with shared living (17 of 41)</strong>, ahead of finding a roommate (12) and rent being too high (11). And then your design adds a feature whose entire purpose is introducing students to strangers in their area.</p>
+      <p>That is not a fatal contradiction — but as currently conceived, a hangout/meetup feature means: an events data source, RSVP flows, a calendar, a moderation queue, a no-show problem, and a physical safety risk that directly undermines your stated priority. It also has a cold-start problem of its own — events need organisers and attendees simultaneously, on top of the marketplace cold-start you already have.</p>
+
+      <h4>The reframe</h4>
+      <p>Look again at step 5 of your own user flow: <em>"arrange meet roommate to see the flat together."</em> <strong>You already have a real-world meetup in the product.</strong> You do not need a separate social product — extend that moment. Make it "meet your roommate <em>and</em> two other verified pairs looking in the same district this month." Same logistics, same safety framing, no new cold-start, and it delivers belonging as a by-product of a task users already want to do.</p>
+      <p>For the informational half of belonging, do not build a social graph. <strong>Generate a personalised settling-in plan from the quiz data you already collect</strong> — "your first three weeks in Hung Hom, for someone who cooks and sleeps early." That is GenAI-native, needs no users to be useful, carries zero physical safety risk, and maps directly onto the theme.</p>
+
+      <div class="resolve">
+        <div class="rl">Resolution</div>
+        <p>Belonging is delivered as <strong>information + one extended meetup</strong>, not as a social network. This keeps priority #1 intact, removes an entire build surface, and still satisfies "culture and belonging" for the judges.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tension t2">
+    <div class="thead">
+      <span class="ttag">Tension 2</span>
+      <h3>Roommate-first positioning vs. what you can actually demo</h3>
+    </div>
+    <div class="tbody">
+      <p>Roommate matching is a two-sided marketplace. To show it working you need a pool of compatible candidates. In a four-week hackathon you will have <strong>approximately zero real users</strong> — so your headline feature will be demonstrated on seeded data, and judges will know it.</p>
+      <p>Meanwhile the parts of your design that deliver value from a <em>single user</em> — the listing analysis, the area context, the contract guidance, the settling-in plan — are exactly the parts you are currently treating as supporting features.</p>
+
+      <div class="resolve">
+        <div class="rl">Resolution</div>
+        <p>Keep roommate-first <strong>positioning</strong>, but make the demo's wow-moment the single-user GenAI analysis. Open the demo with one real Hong Kong listing being audited live — real photos, real RVD rent data, a real generated area brief. Then move to the matching flow on seeded profiles. This way the demo's credibility rests on something that genuinely works, and the matching is presented as the designed journey rather than the proof.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tension t3">
+    <div class="thead">
+      <span class="ttag">Tension 3</span>
+      <h3>"Avoid competition by pivoting to roommates" is only half true</h3>
+    </div>
+    <div class="tbody">
+      <p>Your competitive read is right about listings and wrong about the alternative. Roommate matching is <strong>also</strong> crowded: SpareRoom, Flatmate.com, Roomster, and — most importantly in Hong Kong — Facebook groups with tens of thousands of members that are completely free and already where your users are.</p>
+      <p>So "we do roommates instead of listings" swaps one saturated market for another saturated market. The unoccupied position is neither of those. It is <strong>verification</strong> — nobody in Hong Kong currently offers a trusted, institution-backed way to know that a listing is real and a person is who they say they are. That is precisely the gap your own market research documents: forged owner authorisation, cloned rental sites, deposit-before-viewing scams, fake listings used as bait, and rooms that are half the advertised size.</p>
+
+      <div class="resolve">
+        <div class="rl">Resolution</div>
+        <p>Position as <strong>verified trust infrastructure for student housing</strong>. Compatibility matching is the delivery mechanism; verification is the product. This also reframes your differentiation from "we're nicer than Facebook groups" (weak) to "we are the only place where both the flat and the person are verified" (strong, and defensible).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ GENAI ============ -->
+<section>
+  <h2><span class="num">04</span>The GenAI Defensibility Problem</h2>
+  <p class="lede">This is your most fixable risk and the one most likely to cost you points. Criterion 3 explicitly requires a technical component that <em>requires</em> GenAI. Right now, a sharp judge could argue that your core technical claim does not.</p>
+
+  <div class="callout danger">
+    <div class="label">The problem</div>
+    <p>Your deck specifies the matching engine as a weighted arithmetic formula: <code>(A1_match × 3) + (A2_match × 3) + (A3_match × 2) + ... / max_possible × 100</code>. <strong>That is a spreadsheet, not GenAI.</strong> The personality quiz is a form. The listing filters are database queries. If your pitch says "we use AI to match roommates" and the implementation is a weighted sum, a judge who reads your code will mark you down — and the LLM-generated narrative explaining the score does not rescue it, because the narrative is decoration on top of arithmetic.</p>
+  </div>
+
+  <h3>Make GenAI load-bearing</h3>
+  <p>You already have the right pieces in your design. The task is to promote the ones that genuinely cannot be done without GenAI, and demote the ones that can.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:30%">Component</th><th style="width:20%">Genuinely GenAI?</th><th style="width:50%">Verdict and action</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Multimodal listing audit</strong><br><span class="note">photos → room dimensions, condition, furniture, red flags</span></td>
+          <td><span class="pill p-strong">Yes — strongly</span></td>
+          <td><strong>Promote to headline.</strong> Vision models estimating real room size from photos, detecting stock images, flagging mismatch between listing text and photos, and comparing rent against RVD data. This is genuinely multimodal, cannot be rules-based, and directly attacks the "room was half the size advertised" pain from your deck.</td>
+        </tr>
+        <tr>
+          <td><strong>Grounded guidance (RAG)</strong><br><span class="note">contract tips, area facts, local norms</span></td>
+          <td><span class="pill p-strong">Yes — strongly</span></td>
+          <td><strong>Promote to headline.</strong> Retrieval over a curated Hong Kong corpus — RVD rental data, EAA guidelines, Lands Tribunal procedure, stamp duty, standard tenancy terms, official district statistics — with <em>citations on every claim</em>. Grounding plus citation is what makes this both defensible as GenAI and ethically safe. This is also your highest-impact feature for non-local students.</td>
+        </tr>
+        <tr>
+          <td><strong>Day-in-the-life narrative</strong><br><span class="note">what living in this flat is actually like</span></td>
+          <td><span class="pill p-strong">Yes</span></td>
+          <td><strong>Keep, but as text only.</strong> Grounded in real commute times, transit data, amenities and the user's own schedule. See the ethics warning below — do <em>not</em> generate images of the actual flat.</td>
+        </tr>
+        <tr>
+          <td><strong>Multilingual layer</strong></td>
+          <td><span class="pill p-strong">Yes</span></td>
+          <td><strong>Cheap win.</strong> Every output above in the user's first language. High impact for your exact audience, near-zero build cost, and it demonstrates GenAI capability across the whole product rather than in one corner.</td>
+        </tr>
+        <tr>
+          <td><strong>Compatibility narrative</strong></td>
+          <td><span class="pill p-mod">Partly</span></td>
+          <td><strong>Be honest about the split.</strong> The <em>score</em> is arithmetic; the <em>explanation</em> and the friction-point flagging are GenAI. Say that out loud in the pitch — "weighted scoring, LLM-generated narrative" — because candour here reads as competence, while overclaiming reads as inexperience.</td>
+        </tr>
+        <tr>
+          <td><strong>Quiz generation / matching score</strong></td>
+          <td><span class="pill p-weak">No</span></td>
+          <td><strong>Stop calling this AI.</strong> A form and a weighted sum. Keep them — they work — but do not put them forward as your GenAI credential.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="label">One hard technical warning</div>
+    <p><strong>Do not generate images of real flats.</strong> If "help visualise daily life with each house" means synthesising pictures of the property, drop it. You would be generating plausible-looking images of a real place a student is about to sign a lease on. That is misinformation, it is an ethics-criterion landmine, and it is trivially avoidable. Generate the <em>narrative</em> — commute, noise, what's open at 11pm, where the nearest supermarket is — and keep the property photography authentic and unedited. You lose nothing and you remove a serious liability.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ SCOPE ============ -->
+<section>
+  <h2><span class="num">05</span>Scope Lock — Build, Stub, Cut</h2>
+  <p class="lede">Four weeks is roughly one solid product. Your current flow is three. Here is a defensible allocation.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:34%">Your flow step</th><th style="width:18%">Decision</th><th style="width:48%">Reasoning</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>1. Login + ID verification</strong></td>
+          <td><span class="pill p-strong">Build properly</span></td>
+          <td>This is your differentiator, so it must look real. University email verification plus student-card OCR. Store only a boolean attestation, never the document.</td>
+        </tr>
+        <tr>
+          <td><strong>2. Lifestyle quiz</strong></td>
+          <td><span class="pill p-strong">Build properly</span></td>
+          <td>Feeds everything downstream. Consider splitting it: lifestyle questions at onboarding, housing/budget questions when the user starts browsing. A 22-question wall at signup will hurt real completion even if it demos fine.</td>
+        </tr>
+        <tr>
+          <td><strong>3. Roommate matching + chat + video</strong></td>
+          <td><span class="pill p-mod">Build, with seeded data</span></td>
+          <td>Keep the flow and the narrative generation. Be explicit in the demo that profiles are seeded — judges respect acknowledged simulation far more than a fake live pool. For chat and video, <em>embed existing tools</em> (Jitsi, Whereby) rather than building them. Gate video behind a mutual match.</td>
+        </tr>
+        <tr>
+          <td><strong>4. Filtered listings + GenAI context + comparison</strong></td>
+          <td><span class="pill p-strong">Build deepest</span></td>
+          <td><strong>This is your demo.</strong> It works with one user and real data, it carries the strongest GenAI credential, and it attacks the most documented pain. Spend the most time here.</td>
+        </tr>
+        <tr>
+          <td><strong>5. Arrange meetup to view the flat</strong></td>
+          <td><span class="pill p-mod">Stub, but lean on it</span></td>
+          <td>Extend this into your belonging feature rather than building a separate one. A scheduling handoff plus the "two other verified pairs in this district" extension is enough.</td>
+        </tr>
+        <tr>
+          <td><strong>Separate social hangout platform</strong></td>
+          <td><span class="pill p-weak">Cut</span></td>
+          <td>Conflicts with your #1 priority, needs its own cold-start, and is the single largest unforced build cost in the plan. Replace with the generated settling-in plan.</td>
+        </tr>
+        <tr>
+          <td><strong>Landlord portal, payments, 3D reconstruction, face scanning</strong></td>
+          <td><span class="pill p-weak">Already cut</span></td>
+          <td>Your deck made these calls correctly — including face scanning, which was the right privacy decision. Do not let scope creep reintroduce them.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Four-week plan</h3>
+  <ol class="ranked">
+    <li><span class="t">Week 1 — Corpus and contract</span><p>Assemble the Hong Kong source corpus for RAG (rental data, EAA guidance, tenancy terms, district statistics). Lock the quiz. Lock the verification flow. Freeze the feature list in writing — this is the week where scope discipline is won or lost.</p></li>
+    <li><span class="t">Week 2 — Verification, quiz, matching</span><p>Auth, student-card OCR, university email verification, quiz, weighted scoring, and the GenAI compatibility narrative. Get the seeded profile set built now so the matching demo is rehearsable early.</p></li>
+    <li><span class="t">Week 3 — The listing layer (your demo centrepiece)</span><p>Filters, multimodal listing audit, price-fairness check against RVD data, district briefs with citations, side-by-side comparison, and the multilingual layer. This is the week that decides your technical score.</p></li>
+    <li><span class="t">Week 4 — Integration, ethics, demo</span><p>Embed chat and video, build the extended meetup, write the ethics and sustainability section, and rehearse the demo end to end at least three times. Reserve the final two days purely for rehearsal — it is the highest-return time in the whole month.</p></li>
+  </ol>
+</section>
+
+<hr class="rule">
+
+<!-- ============ ETHICS ============ -->
+<section>
+  <h2><span class="num">06</span>Ethics and Sustainability — Four Unaddressed Gaps</h2>
+  <p class="lede">Your instincts here are good, which is why the gaps are worth closing — a strong ethics section is one of the cheapest ways to outscore teams with better prototypes.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:26%">Gap</th><th style="width:38%">The risk</th><th style="width:36%">The fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>District reviews can stigmatise communities</strong></td>
+          <td>Free-text opinions about an area encode class and racial bias, can depress property values, and harm the people who live there. Your deck's own note about flagging "which areas are more dangerous" is a red flag for exactly this.</td>
+          <td>Replace opinion with <strong>structured, sourced attributes</strong>: official crime statistics, commute times, amenities, noise. Cite the source. Let users filter, not editorialise. This is also more useful to a student than someone's vibe.</td>
+        </tr>
+        <tr>
+          <td><strong>Aggregate data can de-anonymise</strong></td>
+          <td>Your regulator-data idea is valuable, but "aggregate" data from three complaints in one small building identifies those three tenants. You would be handing regulators a dataset that reveals individuals.</td>
+          <td>Set a <strong>minimum cohort threshold</strong> before anything is published — no derived statistic from fewer than five reports. Collect consent at submission. Never publish individual attribution, even internally.</td>
+        </tr>
+        <tr>
+          <td><strong>Student ID storage</strong></td>
+          <td>Holding scans of student identity documents creates a serious PDPO exposure and a breach liability that would end the project.</td>
+          <td>Store the <strong>verification result only</strong> — a boolean plus institution and timestamp. Delete the source image immediately after OCR. Say this explicitly in the pitch; it is a strength, not a detail.</td>
+        </tr>
+        <tr>
+          <td><strong>Reporting can be weaponised</strong></td>
+          <td>Retaliatory reports against a roommate after a deposit dispute. Reports on people are also reputational harm with no natural appeal path.</td>
+          <td>Keep reports <strong>private and non-public</strong>, route them to a human review step, and never surface a report count on a profile. The distinction you already drew — report people, review properties — only holds if reports stay invisible to other users.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout purple">
+    <div class="label">Sustainability — the gap nobody has mentioned</div>
+    <p>"Sustainability" in the criteria almost certainly means <em>will this survive after the hackathon</em>, and your design currently has no revenue path. This matters because it also weakens your feasibility score.</p>
+    <p>You have three plausible options, and one is clearly best:</p>
+    <p style="margin-bottom:0">
+    <strong>① Verified-tenant access for landlords and operators</strong> — they pay for pre-verified, lower-risk tenants. This aligns the incentive correctly, does not tax students, and is the option I would lead with.<br>
+    <strong>② Institutional licensing</strong> — universities pay to offer it to incoming students as part of their arrival service.<br>
+    <strong>③ Data and insights licensing</strong> to regulators or researchers, under the aggregation guardrails above.<br>
+    <span class="note" style="display:block;margin-top:8px">Note the strategic elegance of ①: the people who currently pay HK$5,000 agent fees are the students, but the people who <em>benefit</em> from verification are the landlords — who currently absorb vacancy and tenant risk. Shift who pays to who benefits.</span>
+    </p>
+  </div>
+
+  <div class="callout good">
+    <div class="label">One theme-alignment opportunity you are missing</div>
+    <p>Your theme lists <strong>health</strong> alongside homes, happiness and identity — and your own deck cites that roughly <strong>70% of exchange students name housing as their biggest stressor</strong>. That is a mental-health claim, not just a logistics claim. Frame the problem as <em>housing stress as a health issue for arriving students</em>, supported by your survey's satisfaction data (17 of 41 dissatisfied with their living situation) and the 46% talent-retention failure. It maps your product directly onto a theme keyword you are currently not claiming, at zero build cost.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ============ DEMO ============ -->
+<section>
+  <h2><span class="num">07</span>The Demo Script</h2>
+  <p class="lede">Five minutes, structured so that the strongest evidence lands first and the simulated parts are framed as deliberate.</p>
+
+  <ol class="ranked">
+    <li><span class="t">Open on the problem with your own data (45s)</span><p>Lead with the two numbers that are hardest to argue with: 73% want verified profiles, 68% rate trust verification critical, and only 2 of 41 rated it unimportant. Then the market context — a 120,000-bed shortfall by 2028, and documented forgery and deposit fraud. Land the health framing: this is the biggest stressor for arriving students.</p></li>
+    <li><span class="t">Live listing audit on a real Hong Kong listing (90s)</span><p>The centrepiece. Take a real listing, run the multimodal audit, show the estimated room size against the advertised size, the price against RVD data, and a red-flag detection. This is real, it works with one user, and it is unambiguously GenAI. Nothing else in your demo needs to carry as much weight as this.</p></li>
+    <li><span class="t">Verification and the quiz (45s)</span><p>Show university email verification and student-card OCR, and state plainly that only the attestation is stored, never the document. Then the quiz, kept short on screen.</p></li>
+    <li><span class="t">Matching, with honest framing (60s)</span><p>Run the matching flow. Say the words "these profiles are seeded for the demo" — it buys credibility. Show the GenAI compatibility narrative and the friction-point flagging, and describe the scoring accurately as weighted, with the narrative generated.</p></li>
+    <li><span class="t">The grounded brief and the settling-in plan (60s)</span><p>Generate the district brief with visible citations, and the personalised three-week settling-in plan. This is where belonging and culture land — as information, not as a social network.</p></li>
+    <li><span class="t">Close on ethics and sustainability (30s)</span><p>Report people, review properties. Attestation not documents. Minimum cohort thresholds for any published aggregate. Verified-tenant access as the revenue model. End on the regulator-data opportunity as your systemic impact story.</p></li>
+  </ol>
+
+  <div class="callout">
+    <div class="label">If you remember only one thing</div>
+    <p>Your weakest criterion is not the problem framing or the ethics — it is that <strong>your headline technical claim does not currently require GenAI</strong>. Promote the multimodal listing audit and the cited RAG layer to the front of the pitch, demote the weighted matching to its honest role, and cut the separate social feature. That single set of moves raises your score on three of the five criteria at once.</p>
+  </div>
+</section>
+
+<!-- ============ NOTE ============ -->
+<section>
+  <h2><span class="num">08</span>Notes on This Assessment</h2>
+  <div class="callout">
+    <p><strong>PCV unchanged at 18/24.</strong> Your refinements sharpen the solution but do not change the underlying problem, so the score holds. The two points you are still leaving on the table remain Price and Performance — both gated by supply-side liquidity, which a four-week prototype cannot resolve and should not pretend to.</p>
+    <p><strong>Evidence caveat carries forward.</strong> Your survey (n=41) is 51% dormitory-dwelling, so much of the reported housing pain is anticipated rather than experienced. The signals that survive that critique are the trust and verification ones — which is fortunate, because those are the ones this plan is built on.</p>
+    <p style="margin-bottom:0"><strong>Not legal advice.</strong> The RAG corpus would need qualified Hong Kong legal review before any generated contract guidance is shown to a real user. For a hackathon prototype, cite official sources and add a visible disclaimer.</p>
+  </div>
+</section>
+
+<footer>
+  Prepared 23 September 2026 for a four-week hackathon build. Assessed against the five stated judging criteria and the Hexa Opportunity Memo / PCV framework. Sources: RentMate project deck, nomination survey (n=41, 20 September 2026), and the Hong Kong rental market research briefing of September 2026.
+</footer>
+
+</div>
+</body>
+</html>
