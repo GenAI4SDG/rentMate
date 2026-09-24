@@ -2,7 +2,7 @@
 
 **The single source of truth.** If it isn't in this document, it isn't decided.
 Last updated: 23 September 2026 · Owner: _[assign one person]_ · Status: **scope locked, pending organiser requirements**
-
+(note: Ctrl Shift V to view) 
 ---
 
 ## 0. Read this first (60 seconds)
