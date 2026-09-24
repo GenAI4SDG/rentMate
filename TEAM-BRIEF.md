@@ -1,8 +1,11 @@
 # RentMate — Team Brief
 
 **The single source of truth.** If it isn't in this document, it isn't decided.
-Last updated: 23 September 2026 · Owner: _[assign one person]_ · Status: **scope locked, pending organiser requirements**
-(note: Ctrl Shift V to view) 
+Last updated: 24 September 2026 · Owner: _[assign one person]_ · Status: **scope locked · organiser requirements answered · TypeScript migrated · 24 days to submission**
+(note: Ctrl Shift V to view)
+
+> **⏰ Deadline: ~18 October 2026. Build deadline and submission deadline are the same — there is no buffer.**
+> Treat **14 October as code freeze**. The last days are for the demo video, write-up and submission, not for building.
 ---
 
 ## 0. Read this first (60 seconds)
@@ -16,6 +19,11 @@ Last updated: 23 September 2026 · Owner: _[assign one person]_ · Status: **sco
 **What we are NOT building.** Native mobile app · 3D room reconstruction · face scanning · payments · landlord portal · separate social/events platform · generated images of real flats.
 
 **Our three non-negotiable priorities**, in order: **1. Safety and privacy · 2. Convenience (all in one app) · 3. Transparency (accurate information).**
+
+**What changed on 24 September** — three things that alter the plan:
+1. **"Sustainability" means environmental (SDG), not business viability.** This brief previously assumed the opposite and recommended leading with a revenue model. That was wrong. See §6 for the corrected environmental argument — it is now one of our strongest points, not a gap.
+2. **GenAI inclusion is a hard requirement.** Organisers confirmed any GenAI inclusion is expected and there is no technology blacklist. Our GenAI component is not optional garnish — it is a scored requirement.
+3. **TypeScript migration is complete.** Repo is on `.tsx` with `tsconfig.json`, `typescript`, `@types/*`, `@typescript-eslint/*` and `@supabase/supabase-js` installed.
 
 ---
 
@@ -44,14 +52,38 @@ Hong Kong has more people looking for homes than at any point on record, and the
 
 ## 2. The four selling points
 
+These are **tiered**, not equal. Confirmed by the team on 24 September. Pitch them in this order and with these weights.
+
+### Tier 1 — Core product positioning (SP1 + SP2)
+
+This is what RentMate *is*. Spend the most pitch time here and build it first.
+
 | # | Selling point | Evidence strength | Notes |
 |---|---|---|---|
-| 1 | Full, transparent flat listings with reviews | **Moderate** | Listings demand strong (59% picked apartment searching). Reviews only 39% — and the review corpus needs completed tenancies we won't have. |
-| 2 | Fast habits-based filtering of verified persons via student ID | **Strong** | Our best-evidenced claim. Verified profiles 73% (#1), compatibility matching 68% (#2), trust verification 68% with only 2/41 detractors. |
-| 3 | Gen-AI legal and cultural guidebook + senior mentors + real-world meetups | **Unvalidated** | Zero direct survey evidence. Well-grounded in market research. Must be tested before it goes on a slide. |
-| 4 | Anonymised complaints to authorities or landlords | **Unvalidated + needs reframing** | See §6 — as originally worded this cannot work. |
+| 1 | Full, transparent flat listings with reviews | **Moderate** | Listings demand strong (59% picked apartment searching). Reviews only 39% — and the review corpus needs completed tenancies we won't have. Build the listing transparency; be modest about reviews. |
+| 2 | Fast habits-based filtering of verified persons via student ID | **Strong** | Our best-evidenced claim. Verified profiles 73% (#1 of 12), compatibility matching 68% (#2), trust verification 68% with only 2/41 detractors. **Lead the whole pitch with this.** |
 
-**Positioning statement.** RentMate is **verified trust infrastructure for student housing**, delivered through compatibility matching. Compatibility is the *mechanism*; verification is the *product*. This is the sentence to use everywhere.
+> **Positioning statement.** RentMate is **verified trust infrastructure for student housing**, delivered through compatibility matching. Compatibility is the *mechanism*; verification is the *product*. Use this sentence everywhere.
+
+### Tier 2 — Originality and the community/mental-health play (SP3)
+
+This is our bid for **originality and value**, and it is how we earn the **community / mental-health** marking criterion. It is also the least evidenced part of the design.
+
+| # | Selling point | Evidence strength | Notes |
+|---|---|---|---|
+| 3 | Gen-AI legal and cultural guidebook + senior mentors + real-world meetups | **Unvalidated** | Zero direct survey evidence. Strongly grounded in market research (furnishing/deposit/disposal disputes, 睇樓紙 traps, 46% talent churn, information inequality). Deliver as **information + one extended meetup**, not a social network — see §4. |
+
+### Tier 3 — Side asset, not a headline (SP4)
+
+| # | Selling point | Evidence strength | Notes |
+|---|---|---|---|
+| 4 | Complaints and reviews packaged as data for regulators or other groups | **Unvalidated — internal design note only** | Confirmed 24 Sep: this is a **side note**, not a selling point. Do not put it on a slide as a headline. It survives as a design principle (aggregate pattern intelligence) with the guardrails in §6. |
+
+> **Note on SP4.** Because it is no longer a headline claim, the earlier objection to it (that an anonymous complaint to your own landlord is self-defeating) is now just an internal design constraint rather than a positioning problem. Keep reports private and human-reviewed; keep the aggregate data behind the minimum-cohort threshold. Then it is a legitimate long-term data asset without needing to be pitched.
+
+### Evidence caveat that must travel with all of this
+
+**51% of survey respondents live in a dormitory**, so their reported housing pain is largely *anticipated*, not experienced. Weight Q11–Q13 heavily; discount Q6–Q9 and Q14–Q18. n=41, single self-selected survey — not generalisable.
 
 ---
 
@@ -141,7 +173,32 @@ These are not nice-to-haves. Criterion 5 is "sustainability and ethics", and the
 - **① Aggregate pattern intelligence** — anonymise across many tenants to surface "this agency has 7 unresolved deposit disputes" or "this building has 3 unlicensed-bed-space reports". Genuinely new information no individual can produce.
 - **② Templated escalation** — generate the correctly-cited, correctly-addressed complaint or EAA/18222 filing for the tenant to send **under their own name**, with evidence assembled for them. We remove the effort and the legal ignorance, not the identity.
 
-**Sustainability (our revenue gap).** Best option: **landlords and operators pay for verified-tenant access.** Note the elegance — students currently pay the HK$5,000 agent fee, but *landlords* are the ones who benefit from verification, since they absorb vacancy and tenant risk. **Shift who pays to who benefits.** Alternatives: institutional licensing to universities; data and insights licensing under the aggregation guardrails above.
+**Sustainability — corrected 24 September.** Organisers confirmed "sustainability" refers to the **SDG / environmental** dimension. An earlier version of this brief wrongly assumed business viability and recommended leading with a revenue model. Disregard that. The environmental case below is genuinely strong, and the best part is that **it is delivered by our core product rather than bolted on.**
+
+### The environmental argument for RentMate
+
+**The context — why housing is Hong Kong's highest-leverage climate lever.**
+
+| Fact | Figure | Source |
+|---|---|---|
+| Share of Hong Kong's electricity consumption attributable to buildings | **~90%** | HKSAR Carbon Neutrality Office |
+| Share of Hong Kong's carbon emissions from buildings | **over 60%** | HKSAR Carbon Neutrality Office / HK2050isNow |
+
+In a city where buildings are 90% of electricity and over 60% of carbon, **how people occupy buildings matters more than almost anything else**. That is our lever.
+
+**The mechanism — three steps, all defensible:**
+
+1. **Shared housing is lower-carbon per person.** Two students in one flat share one air-conditioning system, one fridge, one washing machine, and one set of common space instead of two. In Hong Kong's subtropical climate, **air conditioning is the dominant residential electricity load** — so consolidating two single-occupancy households into one shared flat removes an entire cooling system from the grid. Research on household size consistently finds per-capita energy and carbon falling as household size rises.
+
+2. **Better matching means longer tenancies, which means fewer moves.** This is the original insight and it is the one to lead with, because it makes *the matching engine itself* an environmental intervention. A failed roommate match causes someone to move again — and moving generates furniture waste and embodied carbon. Our own market research already flags **disposal responsibility as one of the three most-litigated tenancy issues in Hong Kong** — that is the waste stream, made visible. A good match that lasts a full academic year avoids an entire second move.
+
+3. **Faster matching reduces vacancy.** Empty rooms still consume common-area energy and represent wasted embodied carbon in a city with a 120,000-bed shortfall. Filling them faster is straightforwardly better.
+
+**The pitch line.** *Hong Kong's buildings produce over 60% of the city's carbon, and the single biggest determinant of residential energy use is how many people share a flat. RentMate makes shared living work better and last longer — so more students choose it, and fewer of them move twice.*
+
+**SDG mapping.** SDG 11 (Sustainable Cities and Communities) — target **11.1** adequate, safe and affordable housing, and target **11.6** reducing the environmental impact of cities. Secondarily SDG 12 (responsible consumption) via resource sharing.
+
+**Business viability is still worth one sentence** — under *feasibility* (criterion 4), not sustainability. Keep it short: landlords and operators pay for verified-tenant access, because they absorb the vacancy and tenant risk that verification reduces. Do not build a pitch section on it.
 
 ---
 
@@ -151,33 +208,24 @@ These are not nice-to-haves. Criterion 5 is "sustainability and ethics", and the
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | **Vite + React + TypeScript** | Simpler to reason about than Next.js for a team new to React. Explicit routing, no server-component magic. ⚠️ **The repo is currently JavaScript — see the migration note below.** |
+| Frontend | **Vite + React + TypeScript** ✅ | Simpler to reason about than Next.js for a team new to React. Explicit routing, no server-component magic. **Migrated 24 Sep.** |
 | Backend / DB | **Supabase** | Gives us Auth, Postgres, Storage, Realtime and Edge Functions out of the box. Removes most backend work. |
 | Auth | Supabase Auth — university email (magic link / OAuth) | Aligns with our student-ID verification rail. |
 | Vector search | **Supabase pgvector** | Built in. Gives us RAG with **no extra infrastructure**. Major win. |
 | GenAI calls | **Supabase Edge Functions (Deno)** | **API keys must never reach the client.** Non-negotiable. |
 | Chat / video | **Embed Jitsi or Whereby** | Do not build either. |
-| Hosting | Vercel or Netlify (frontend) | One-click deploy. |
+| Hosting | **Not required** — localhost accepted | Organisers confirmed localhost is fine for the demo (24 Sep). Saves us deploy and CORS debugging. Keep a static `npm run build` working as a fallback. |
 
-> **⚠️ Action required: migrate the repo from JavaScript to TypeScript — this week.**
+> **✅ TypeScript migration — DONE (24 September).**
+> Repo is on `.tsx` with `tsconfig.json`, `typescript`, `@types/react`, `@types/react-dom`, `@typescript-eslint/*` and `@supabase/supabase-js` installed.
 >
-> `GENAI_sdg` was scaffolded from Vite's **JavaScript** React template (`src/App.jsx`, `src/main.jsx`). It has one commit (`init_empty`) and no real code yet, so **migration is essentially free right now** and gets steadily more expensive every day we wait.
->
-> **Why it matters more than usual for us:** Supabase can generate TypeScript types directly from our database schema (`supabase gen types typescript`). Those generated types make every query type-checked — if we rename a column or misspell a field, the editor tells us immediately instead of us debugging a silent `undefined` in week 3. **That is the single best safety net available to a team new to Supabase, and it only works with TypeScript.** Without it we lose our main guardrail.
->
-> TS also catches the exact bug class this team is most likely to hit: wrong prop shapes and wrong field names across React components.
->
-> **Migration steps** (roughly one hour, mostly mechanical):
-> ```bash
-> npm i -D typescript @types/react @types/react-dom
-> npx tsc --init          # then set "jsx": "react-jsx", "strict": true
-> # rename src/*.jsx -> src/*.tsx, add types as the editor complains
-> npm i -D @typescript-eslint/parser @typescript-eslint/eslint-plugin
-> npm i @supabase/supabase-js
+> **One thing still missing — add it today:**
+> ```json
+> "typecheck": "tsc --noEmit"
 > ```
-> Add `npm run typecheck` (`tsc --noEmit`) to CI so type errors fail the build.
+> Add that to `package.json` scripts and run it before every commit and every Friday demo. This is what makes the migration worth having — without running it, TypeScript only helps you inside the editor and broken types still reach `main`. Also confirm `tsconfig.json` has `"strict": true`; strict mode is where most of the value lives.
 >
-> **If the team decides against it:** that is a legitimate call for a four-week sprint, but make it explicitly and record it in §10. What is *not* acceptable is starting in JavaScript and switching in week 3.
+> **Why TypeScript mattered here:** `supabase gen types typescript` generates types from our database schema, making every query type-checked. If we rename a column or misspell a field, the editor tells us immediately instead of us debugging a silent `undefined` in week 3. That is the single best safety net available to a team new to Supabase, and it only works with TypeScript.
 
 ### The skill-gap problem — and how to survive it
 
@@ -199,63 +247,81 @@ Nobody on the team has real experience with React or Supabase. In a four-week bu
 
 ---
 
-## 8. Four-week plan
+## 8. The plan — 24 days to 18 October
 
-**Weekly rhythm:** each week ends with a **working demo**, however ugly. If Friday's demo doesn't run, next week starts by fixing it.
+**The hard constraint:** build deadline and submission deadline are the **same**, on **~18 October 2026**. There is no submission buffer. So the honest read is that we have **three weeks of building, not three and a half.**
 
-### Week 1 — Corpus and contract
-- Everyone completes the Supabase + React quickstart (2 days)
-- Assemble the HK RAG corpus: R&VD rental data, EAA guidance, tenancy terms, stamp duty, district statistics
-- Lock the quiz questions and the verification flow
-- **Freeze the feature list in writing** ← this is where scope discipline is won or lost
-- Repo scaffolded, CI running, one page deployed end to end
+> ### 🛑 Code freeze: 14 October. Non-negotiable.
+> Everything after 14 October is integration, the demo video, the write-up and submission. If a feature is not working on 14 October, **it is not in the demo.** Teams lose hackathons by shipping a broken feature at 2am instead of a working one at midnight.
 
-### Week 2 — Verification, quiz, matching
-- Auth, student-card OCR, university email verification (store attestation only)
+**Weekly rhythm:** each block ends with a **working demo**, however ugly. If Friday's demo doesn't run, the next block starts by fixing it.
+
+### Block 1 — 24–30 Sep: Foundations
+- **Everyone completes the Supabase + React quickstart (2 days).** This is not optional and it is not wasted time.
+- Add `npm run typecheck` to `package.json` and confirm `"strict": true` in `tsconfig.json`
+- **Freeze the feature list in writing** ← scope discipline is won or lost here
+- Assemble the HK RAG corpus: R&VD rental data, EAA guidance, tenancy terms, stamp duty, district statistics. **Organisers have provided no datasets, so this is on us** — start now, it is slower than it looks.
+- Supabase project created; schema drafted; auth skeleton working
+- First page rendered end to end
+
+### Block 2 — 1–7 Oct: Verification, quiz, matching
+- Auth, student-card OCR, university email verification (**store attestation only**)
 - Quiz, weighted scoring, GenAI compatibility narrative
 - **Build the seeded profile set now** so the matching demo is rehearsable early
-- GenAI calls working through Edge Functions with keys server-side
+- GenAI calls working through Edge Functions, keys server-side
+- Milestone: a user can sign up, verify, take the quiz, and see matched profiles
 
-### Week 3 — The listing layer (our demo centrepiece)
+### Block 3 — 8–13 Oct: The listing layer (our demo centrepiece)
 - Filters, multimodal listing audit, price-fairness check against R&VD data
-- District briefs **with visible citations**
+- District briefs **with visible citations**; commute and transit data (external APIs are permitted — arrange them now if we want them)
 - Side-by-side comparison, multilingual layer
-- **This is the week that decides our technical score.** Protect it.
+- **This block decides our technical score. Protect it.** If Block 2 overruns, cut from Block 4, never from here.
 
-### Week 4 — Integration, ethics, demo
-- Embed chat and video, build the extended meetup and settling-in plan
-- Write the ethics and sustainability section
-- Rehearse the demo end to end **at least three times**
-- **Reserve the final two days purely for rehearsal** — highest-return time in the month
+### Block 4 — 14–18 Oct: Integration, ethics, submission
+- 14 Oct: **code freeze**
+- Embed chat and video; wire the extended meetup and settling-in plan
+- Write the ethics and sustainability section (SDG framing — see §6)
+- **Record the demo video.** Organisers recommend a video backup, and with a live demo and no buffer it is essential insurance — a dead laptop on the day costs us everything.
+- Rehearse the live demo **at least three times**, once with someone deliberately interrupting
+- 18 Oct: **submit**
 
-### Workstreams (scale to any team size)
+### Workstreams — mapped to our 4 people
 
-| WS | Owns | Merge rule |
+| Person | Owns | Notes |
 |---|---|---|
-| **WS1 Platform** | Supabase, auth, schema, Edge Functions, deploy | — |
-| **WS2 Frontend** | React, design system, all screens | — |
-| **WS3 GenAI** | Corpus, prompts, vision audit, RAG, evals | — |
-| **WS4 Product & Ethics** | Scope guardian, ethics doc, user testing | Merges into WS5 on a small team |
-| **WS5 Demo & Pitch** | Script, deck, rehearsal, narrative | Merges into WS4 on a small team |
+| **P1** | **WS1 Platform** — Supabase, schema, auth, Edge Functions | Also owns the RAG corpus ingestion pipeline |
+| **P2** | **WS2 Frontend** — React, design system, all screens | Owns the demo path screens |
+| **P3** | **WS3 GenAI** — corpus, prompts, vision audit, RAG, evals | Owns the GenAI requirement — our scored criterion |
+| **P4** | **WS4 Product & Ethics + WS5 Demo & Pitch** — scope guardian, ethics doc, demo script, video | Load-bearing, not spare capacity |
 
-> **The single most important role is WS4 — the scope guardian.** One person must have explicit authority to say "that is not on the demo path, we are not building it." In a one-month hackathon, scope discipline predicts success better than technical skill. If nobody owns this, the project fails by week 3.
+> **The single most important role is WS4 — the scope guardian (P4).** One person must have explicit authority to say "that is not on the demo path, we are not building it." In a three-week build, scope discipline predicts success better than technical skill. If nobody owns this, the project fails in week 3.
+
+**Team size:** we have 4; the requirement is 3–5, so we are compliant. Cross-team collaboration is permitted but not the default — treat it as an option if we get stuck on something specific, not as a plan.
 
 ---
 
-## 9. Open questions for the organisers
+## 9. Organiser answers — resolved 24 September
 
-Send these now. The answers change our build.
+All ten questions answered. Recorded here so nobody re-asks. **Bold = what it changes for us.**
 
-1. **Are any technologies mandated or forbidden?** Specifically cloud providers, and whether a specific GenAI provider/API is required.
-2. **Is a deployed URL required, or is localhost acceptable for the demo?**
-3. **Judging format** — live demo duration, Q&A, and will judges read our code?
-4. **Are external APIs permitted** — Google Maps/transit, R&VD open data?
-5. **Data privacy expectations for the demo** — are synthetic profiles acceptable?
-6. **Team size**, and is cross-team collaboration allowed?
-7. **Submission deadline vs. build deadline** — how much buffer do we have?
-8. **Are pre-approved datasets available**, or do we source our own?
-9. **IP and code ownership** — who owns what we build?
-10. **Does "sustainability" mean environmental, or business viability?** This changes our pitch.
+| # | Question | Answer | What it changes |
+|---|---|---|---|
+| 1 | Mandated or forbidden technologies? Required GenAI provider? | **Any GenAI inclusion is expected. No blacklist** on tech or cloud providers. | **GenAI is a scored requirement, not garnish.** Confirms §5 — the GenAI component must be load-bearing. No provider constraints, so pick the best model for each job. |
+| 2 | Deployed URL required, or is localhost OK? | **localhost is fine.** | Saves deploy and CORS debugging. Do not spend time on Vercel/Netlify. Keep `npm run build` working as a fallback. |
+| 3 | Judging format — duration, Q&A, code review? | **Live demo.** A video is recommended as backup. Non-software projects don't even need a software demo. | **Record a video.** With a live demo and no submission buffer, a dead laptop costs us everything. Also means rehearsal matters more than polish. |
+| 4 | External APIs permitted? (Maps, transit, R&VD open data) | **No blacklist. If we can arrange it, that's good.** | Maps/transit and R&VD open data are fair game and materially strengthen the district briefs and price-fairness check. **Start arranging access in Block 1.** |
+| 5 | Synthetic profiles acceptable for the demo? | **Yes, no blacklist.** | No privacy blocker on demo data. Use synthetic profiles throughout. |
+| 6 | Team size? Cross-team collaboration? | **We have 4; requirement is 3–5. Collaboration allowed but not the default.** | We're compliant. Workstreams mapped to 4 people in §8. Treat collaboration as a targeted unblock, not a plan. |
+| 7 | Submission vs. build deadline — how much buffer? | **Same deadline, in 3.5 weeks (~18 Oct).** | ⚠️ **The biggest constraint.** Three weeks of building, not three and a half. Code freeze 14 Oct. See §8. |
+| 8 | Pre-approved datasets available? | **None provided. We source our own.** | Corpus assembly is entirely on us and is slower than it looks. **Start in Block 1.** |
+| 9 | IP and code ownership? | **Probably ours** (and it's largely AI-produced anyway). | Not a blocker. No action. |
+| 10 | Does "sustainability" mean environmental or business viability? | **Environmental — it's about the SDG.** | ⚠️ **Corrects an earlier wrong assumption in this brief.** See §6 for the environmental argument. Business viability now sits under *feasibility* only. |
+
+### The three answers that actually change our build
+
+1. **Q10 — sustainability is environmental.** Our earlier plan treated this as a business-model gap. It isn't a gap at all: §6 sets out why **better roommate matching is itself a carbon intervention**, which means our core product *is* the sustainability story. That is a much stronger pitch than a revenue slide.
+2. **Q7 — no submission buffer.** Three weeks of building. Everything else in the plan bends around this.
+3. **Q1 + Q3 — GenAI is required and the demo is live.** Our GenAI component must be genuinely load-bearing (§5), and we need a recorded video as insurance.
 
 ---
 
@@ -314,8 +380,6 @@ Our WorkBuddy workspace folder holds two things that make the whole team's AI co
 
 | # | Action | Owner | By |
 |---|---|---|---|
-| 1 | Send the 10 organiser questions in §9 | | Today |
-| 2 | Create the GitHub repo, commit this brief and `.workbuddy-ai/` | | Today |
 | 3 | Assign a scope guardian (WS4) — non-negotiable | | Today |
 | 4 | Everyone completes the Supabase + React quickstart | All | Day 3 |
 | 5 | Lock the quiz questions | WS3 | Day 4 |

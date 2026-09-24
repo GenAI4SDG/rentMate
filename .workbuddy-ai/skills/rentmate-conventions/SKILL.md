@@ -34,7 +34,37 @@ If a request falls outside this list, say so and ask whether to change the scope
 - **GenAI calls go through Supabase Edge Functions (Deno)** so API keys never reach the client
 - Deploy frontend on Vercel or Netlify
 
-**Repo status:** this repo (`GENAI_sdg`) was scaffolded from Vite's **JavaScript** template. The agreed target is TypeScript. If you are asked to write new source files before the migration has happened, **raise it** — do not silently write more `.jsx`. TypeScript matters here specifically because Supabase's generated schema types are our main safety net, and they require TS. See `TEAM-BRIEF.md` §7 for the migration steps.
+**Repo status:** TypeScript migration is **done** (24 Sep) — `.tsx`, `tsconfig.json`, `@types/*` and `@supabase/supabase-js` are all in place. Write `.tsx`, not `.jsx`. Run `npm run typecheck` before committing (add the script if it's missing — it should be `"typecheck": "tsc --noEmit"`). TypeScript matters here specifically because Supabase's generated schema types are our main safety net, and they require TS.
+
+## Deadline — the constraint that governs everything
+
+**Build deadline and submission deadline are the same: ~18 October 2026.** There is no buffer. Treat it as **three weeks of building**.
+
+**🛑 Code freeze: 14 October.** After that it is integration, the demo video, the write-up and submission only.
+
+Practical consequences:
+- When asked to add a feature after 14 October, **push back** and say it is post-freeze.
+- Prefer a working thin path over a half-built ambitious one. Scope discipline outranks technical ambition here.
+- The demo is **live**, so rehearsal matters more than polish. A recorded video is required as backup.
+
+## Sustainability means ENVIRONMENTAL (SDG), not business viability
+
+Organisers confirmed this on 24 September. Do not frame sustainability as a revenue model.
+
+The environmental case, and it is strong — **the matching engine is itself a carbon intervention**:
+- Hong Kong buildings are **~90% of electricity consumption** and **over 60% of carbon emissions**. Building occupation is HK's highest-leverage climate lever.
+- Shared housing is lower-carbon per person — one air-conditioning system, one fridge, one washing machine shared, not two. AC dominates residential load in HK's climate.
+- **Better matching → longer tenancies → fewer moves.** A failed match causes a re-move; moving generates furniture waste and embodied carbon. Our own research flags *disposal responsibility* as one of the top-3 tenancy disputes in Hong Kong — that is the waste stream made visible.
+- Faster matching reduces vacancy in a city with a 120,000-bed shortfall.
+- SDG 11 targets **11.1** (adequate, safe, affordable housing) and **11.6** (environmental impact of cities); secondarily SDG 12 via resource sharing.
+
+Business viability is worth **one sentence under feasibility only**: landlords and operators pay for verified-tenant access. Never build a pitch section on it.
+
+## Selling points are tiered — pitch them in this order
+
+- **Tier 1 (core positioning): verified listings + verified persons.** This is what RentMate *is*. Lead here.
+- **Tier 2 (originality + community/mental-health criterion): the GenAI guidebook, senior mentors, and one extended meetup.** Least evidenced — deliver as *information + one meetup*, never as a social network.
+- **Tier 3 (side asset, never a headline): complaints and reviews packaged as regulator data.** Keep it as an internal design note with the guardrails in the rules above.
 
 ## Hard rules — never violate
 
