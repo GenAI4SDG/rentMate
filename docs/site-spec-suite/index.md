@@ -1,9 +1,9 @@
 # RentMate site specification suite
 
-**Version:** 0.1 — draft for review  
+**Version:** 0.2 — revised draft for team review
 **Prepared:** 7 October 2026  
-**Status:** Unapproved. This is a design/specification proposal, not authorization to implement it.  
-**Project authority:** `../GENAI SDG interim draft.pdf`; product details in `../../PRD.md`; technical/build context in `../build-plans.md` and `../../TEAM-BRIEF.md`.
+**Status:** Records the user’s latest decisions; still requires team sign-off before implementation.
+**Project authority:** `../GENAI SDG interim draft.pdf`; product details in `../../PRD.md`; technical/build context in `../build-plans.md` and `../../TEAM-BRIEF.md`. This draft intentionally proposes in-app chat and an optional gender eligibility filter, which conflict with current `PRD.md` scope and must be reconciled before build.
 
 ## The six documents
 
@@ -21,19 +21,24 @@
 - Visual direction observed: full-bleed campus/transport photograph under a dark overlay, editorial display serif headline, clean sans-serif body text, restrained coral/orange CTA, compact navigation, and a candid Hong Kong student-life feel. The exact font and color tokens have not been inspected in Figma itself; see the Design Brief.
 - The Trust & safety link points to `#trust`, but the published page currently exposes no distinct trust content/section at that target. The visible destination remains the landing-page content. Treat it as a dead-end navigation item until the section/page is implemented.
 - “Start matching” opens an email-verification screen. Its interactive state and whether it sends a real email were not tested; no email was submitted.
-- The landing page says “7 thoughtful questions.” Existing approved project documents specify a 12-question demo path (six lifestyle + six housing), while the original deck contains a 22-question design reference. The final count and how Q7 maps onto those versions need team confirmation.
-- The project PRD and interim report remain authoritative where this draft could otherwise conflict with them. In particular, identity verification is an access gate in the agreed product; demo access must be a clearly marked synthetic-data path, not a false verified account.
+- The landing page says “7 thoughtful questions.” Earlier project documents specify a 12-question demo path and the original deck a 22-question reference. The user has since directed a clearer two-part “About me” / “What I’m looking for” contract; exact final wording/count remains for team sign-off.
+- The user confirmed synthetic profiles, eight Hong Kong universities plus guest/demo, optional gender identity plus a separate strict roommate-gender filter, scalar-only compatibility scoring, optional MBTI decoration, persistent in-app chat deleted on close, and domain eligibility checks.
+- Domain allowlisting does not prove mailbox ownership. The eight institution labels are known; exact university-domain strings must be verified from official sources before implementation.
+- Current project PRD/interim report remain authoritative until formal reconciliation. The latest user choices conflict with current PRD requirements for chat and gender; the revised suite records them as proposed scope changes, not build authorization.
 
 ## Review gate — resolve before build
 
-Recommended starting decisions (not yet approved):
+The revised suite records these user-directed product decisions; the team still needs to ratify them against the current PRD before implementation:
 
-1. Keep real university-email verification as the access gate for real accounts. Add a clearly labelled **Explore demo** route using seeded synthetic profiles so a judge/user can try the flow without email. Demo mode must never set a real `verified` state or collect real housing data.
-2. Implement a real `/trust` page instead of removing the Trust & safety link. Explain the email gate, what is and is not verified, seeded demo data, privacy boundaries, how matching works, and how to report a concern.
-3. Keep the required questionnaire at 12 answers: six lifestyle + six housing. Make the housing section explicitly cover community/living style, preferred location, MTR walking distance, amenities, minimum room size and rent budget. Move lease length/move-in timing to optional browse filters. Remove the “same gender as me” option and do not use gender as a match filter.
-4. Keep the Figma aesthetic, but use a highly legible sans-serif for all question text, labels, answers and controls; reserve the expressive serif for display headings.
+1. Use synthetic profiles and a guest/demo route; offer a university path with domain syntax/allowlist validation for eight Hong Kong universities. A matching domain is eligibility, not proof of mailbox ownership; no “verified” state until Auth confirms the mailbox.
+2. Implement a real `/trust` page that explains email eligibility vs verification, synthetic data, listing limits, chat retention/deletion, gender-data controls and score boundaries.
+3. Replace the vague single quiz with two explicit blocks: **About me** (lifestyle/personality and optional identity) and **What I’m looking for** (roommate and housing constraints). Do not freeze the older 12-question count; exact labels/scales still need team sign-off.
+4. Keep optional self-described gender separate from explicit roommate-gender categories. The latter is a strict filter before scoring; no “same gender as me” combined option and no gender input to compatibility score.
+5. Compatibility is deterministic weighted similarity over soft lifestyle/personality/scalar metrics only. MBTI is optional profile decoration, not a score/filter by default.
+6. “Save to chat” creates a persistent account conversation; explicit close deletes conversation and messages. Guest demo uses clearly labelled local synthetic chat. No third-party messaging vendor is required.
+7. Retain Figma aesthetic and use highly legible sans-serif for all questions, labels, answers and controls; preserve serif for display headings.
 
-**Open decisions:** what “community type” means to the team; exact Q7 wording/options in the Figma quiz; whether any team has approved changing the 12-question split; whether demo mode is read-only or can retain temporary answers in browser memory. The proposed neutral definition and behaviors are stated in the documents and must be explicitly accepted or revised.
+**Open before implementation:** verify exact official email domains for the eight institutions; choose Auth confirmation mode; freeze field scales and weights; approve privacy/visibility for gender categories; choose guest browser storage; define message limits/report handling; and reconcile the chat + gender-filter scope against `PRD.md`, which currently disallows both. The exact Figma Q7 wording and HEX design tokens also remain unverified.
 
 ## Six-box sign-off
 

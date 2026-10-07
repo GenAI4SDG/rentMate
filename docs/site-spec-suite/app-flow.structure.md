@@ -7,7 +7,7 @@ Saved: 2026-10-07T23:23:24
   - [x] H2: 2. Primary journey — demo visitor
   - [x] H2: 3. Primary journey — real student
   - [x] H2: 4. Every visible action has a destination
-  - [ ] H2: 5. Page requirements
+  - [x] H2: 5. Page requirements
     - [x] H3: Landing
     - [x] H3: Trust & safety
     - [x] H3: Quiz

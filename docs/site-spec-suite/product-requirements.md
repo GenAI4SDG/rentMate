@@ -38,7 +38,7 @@ RentMate is a responsive web application to help non-local students settle into 
 9. **Trust & safety information.** Explain domain eligibility versus mailbox verification, what listings are not verified, synthetic data, gender preference privacy and strict filtering, data retention, score-versus-narrative distinction, in-app chat deletion on close, and concern-reporting boundaries. No legal advice or area safety ratings.
 10. **Viewing and settling-in.** Photo gallery and pre-recorded walkthrough request remain available; an external video/meeting link may be an optional viewing handoff, not a chat dependency. Settling-in and generated English/Chinese text are lower priority.
 
-### Proposed two-part questionnaire contract (draft)
+### Proposed questionnaire contract (draft)
 
 This is a structured starting contract, not a claim that the final wording/count is approved. “About me” describes the person; “What I’m looking for” describes desired fit and hard requirements. Questions use readable sans-serif type and “prefer not to say/no preference” where applicable.
 
@@ -63,7 +63,7 @@ This is a structured starting contract, not a claim that the final wording/count
 | What I’m looking for — room size | Minimum private-room size or no minimum | Listing filter; advertised/unknown, never verified |
 | What I’m looking for — budget | Maximum monthly rent in HKD | Hard affordability filter; display selected value |
 
-**Compatibility boundary.** The 0–100 score uses only documented soft lifestyle/personality/scalar factors (sleep timing, shared-space habits, social/guest preference, noise, personal-space preference, bill-splitting style, and any approved communication-style mapping). Normalize each included factor to 0–1 and compute a weighted similarity; publish the factor weights in code/tests. Exclude gender, MBTI, smoking status, district, budget, room size, amenities and other hard eligibility criteria from the score. Apply hard requirements first, then score eligible pairs. No missing value is silently imputed as a preference.
+**Compatibility boundary and first scoring contract.** The 0–100 score uses only soft lifestyle/personality/scalar factors: sleep timing, shared-space habits, social/guest preference, noise, personal-space preference and bill-splitting style. Normalize each to 0–1, where closer values mean more similar. Initial unvalidated weights: sleep 20%, shared-space habits 15%, social/guest 15%, noise 15%, personal space 20%, bill splitting 15%. For the dimensions answered by both profiles, calculate `round(100 × Σ(weightᵢ × (1 − |aᵢ − bᵢ|)) ÷ Σ(shared weights))`; missing factors are omitted and remaining weights renormalized. If there is no shared scored factor, return `insufficient_data`, not a fabricated score. Optional categorical communication style may appear in the narrative but is excluded from arithmetic until its scalar mapping is approved. Gender, MBTI, smoking status, district, budget, room size, amenities and other hard eligibility criteria never contribute to the score. Apply each person’s explicitly selected strict requirements against the other person before scoring; never silently relax them. Publish weights in code/tests; they are starting assumptions, not validated evidence.
 
 **MBTI scope.** A small optional text/letter badge on the profile card is the complete first version. If type validation or badge rendering risks the core path, defer it; do not add an MBTI questionnaire or scoring model.
 
@@ -83,7 +83,9 @@ Remove “same gender as me” from the old combined Q7. Replace the conflated q
 - Generated photographs/visuals of real flats; property images remain authentic and unedited.
 - A profile deletion/account deletion feature; this prototype does not expect real users. Explicitly closing a conversation still deletes that conversation and its messages as specified.
 
-## S4 — Frozen glossary (v0.2 proposal)
+## S4 — Frozen glossary (v0.1)
+
+The terms below are revised for this v0.2 draft and remain subject to team sign-off.
 
 | Term | Meaning in this draft |
 |---|---|

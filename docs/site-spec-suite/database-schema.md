@@ -92,7 +92,8 @@ type OptionalProfileDecorations = {
 
 type MatchResult = {
   eligible: boolean
-  score?: number // computed only if eligible; soft metrics only
+  score: number | null // soft metrics only; null when no shared scored inputs
+  status: 'scored' | 'insufficient_data' | 'ineligible'
   matchedFactors: string[]
   frictionFactors: string[]
 }
@@ -130,8 +131,9 @@ Each demo record includes `id`, `district`, `rentMonthlyHKD`, `roomType`, `ameni
 
 | ID | Question | Proposed default |
 |---|---|---|
-| D1 | Are matches persisted? Existing team decision is open. | No: derive on demand from quiz + seeded profiles; persist only if saved matches are a required demo criterion. |
-| D2 | Should a `profiles` table exist for real users in this prototype? | No, unless contact/profile behavior is approved; fixtures suffice for the synthetic demo. |
-| D3 | Which institution/domain allowlist is supported? | Configure server-side before enabling real-user signup. |
-| D4 | Retention period and account deletion behavior? | Do not admit real users beyond a controlled prototype until text/process is agreed. |
-| D5 | Does “community type” describe living style or resident group? | Approve the neutral living-style interpretation; do not collect demographic preference. |
+| D1 | Which exact email domains map to each of the eight supported universities? | Verify against official university sources; server-side allowlist, no guessed values. |
+| D2 | Supabase OTP or magic link after domain check? | Provider-confirmed mailbox ownership before verified status. |
+| D3 | Final scalar anchors/weights and optional response semantics? | Product/GenAI owner freezes a versioned score contract with tests before implementation. |
+| D4 | Privacy display for gender identity and treatment of self-described/undisclosed identity in strict filter? | Owner-only identity by default; selected filter is not silently relaxed; approve category behavior before build. |
+| D5 | Guest demo storage implementation and reset copy? | Browser-local synthetic data, same-device only, clear-on-close/reset. |
+| D6 | Ratify conflict with `PRD.md`: in-app chat instead of connect-only; optional gender identity and strict matching filter instead of gender out of scope? | Product/scope owner updates the project source of truth before implementation. |

@@ -21,7 +21,7 @@
 
 Global shell on app routes: RentMate mark, back/home navigation, language toggle when implemented, mode/status badge (“Demo — synthetic data” or “University email confirmed”). “Domain eligible” is not “verified.” Never display verified status for a guest or synthetic profile.
 
-## 2. Primary journey — guest/demo visitor
+## 2. Primary journey — demo visitor
 
 | Step | Screen/action | Result and next state |
 |---|---|---|
@@ -37,7 +37,9 @@ Global shell on app routes: RentMate mark, back/home navigation, language toggle
 | 10 | Inspect listing/viewing options | Show data provenance, area citations and photo/walkthrough options. Optional external meeting link is for viewing only, not chat. |
 | 11 | Open Trust & safety | Available from all screens; explains synthetic data, chat limitations and deletion, email/domain checks, gender filter and score boundaries. |
 
-## 3. Primary journey — university path (prototype/test flow)
+## 3. Primary journey — real student
+
+This describes a test/prototype university-email path only; the team does not expect real users. It must not be presented as production onboarding.
 
 1. Landing → **Start matching** → `/start` → **Continue with university email**. State that this is a prototype eligibility route, not a promise of production onboarding.
 2. Show purpose/privacy copy before collection. Validate email format, normalize domain and check server-side institution allowlist. On malformed or unsupported input, show an inline error and do not send a confirmation request.

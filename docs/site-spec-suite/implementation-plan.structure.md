@@ -8,7 +8,7 @@ Saved: 2026-10-07T23:23:29
   - [x] H2: 3. Dependency sequence
   - [x] H2: 4. Priority and cut order
   - [x] H2: 5. Work ownership boundary
-  - [ ] H2: 6. Test and release checklist
+  - [x] H2: 6. Test and release checklist
     - [x] H3: Functional
     - [x] H3: Safety, privacy, accessibility
     - [x] H3: Engineering / demo
