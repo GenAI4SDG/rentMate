@@ -17,7 +17,10 @@ declared below rather than hidden.
 | `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate before scoring. **approved** (agent) |
 | `cps/CP.calculate_match.v1.md` | The deterministic weighted-similarity score. **approved** (agent) |
 | `cps/CP.validate_institution_email.v1.md` | The university-email eligibility check. **approved** (agent) |
+| `PG.rentmate.v1.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
+| `RECONCILIATION.md` | The three product statements + two codebases reconciled against the IP authority |
 | `checks/rentmate_reference_impls.py` | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
+| `checks/build_rentmate_pg.py` | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
 
 ## The approval criterion that was applied
 
@@ -74,6 +77,28 @@ in-memory, I/O-free — and the alternative (inventing a predicate no checker co
 evaluate) is the failure the schema exists to prevent. Each CP states this in a
 comment above its `effects` block.
 
+## The Project Graph, and one real finding about its schema
+
+`PG.rentmate.v1.json` holds three facts (one per CP), built by
+`checks/build_rentmate_pg.py` from the CP corpus — never hand-typed, because a
+hand-typed PG could silently disagree with the corpus. It validates **0 hard / 0
+soft**, coverage is **ok**, staleness is **ok**.
+
+Building it surfaced a genuine coupling in `project_graph.validate_graph`:
+**`origin: ai` requires a non-empty `evidence`, while `outcome: unknown` forbids
+one.** So an `ai`-origin fact can only ever be `infeasible_with_evidence` — an
+AI-authored fact cannot be recorded as "unknown". The alternative was to claim
+`origin: deterministic`, which would be false (the constraint strings are an
+agent paraphrase, not a computed value), so the facts take the
+backward-compatible `unstated` — explicitly *"not assumed authoritative"* — and
+carry their provenance in `metadata.constraint_source` instead. That is a
+declared limitation, not a hidden one.
+
+The IP's two uncovered focuses (`affordability`, `transparency`) get **no**
+`CoverageDeclaration`. That field means "no CP in this system can express this
+node"; these two are merely *not built yet*, and a waiver would be an excuse
+rather than a record. They stay visible as orphans in `ip_tool.py link`.
+
 ## Reproducing the checks
 
 From `coding_assistant/planning_graph/`, with the managed Python 3.13:
@@ -86,6 +111,9 @@ PYTHONPATH=. python ip_tool.py link --ips "$V/ips" --cps "$V/cps"
 PYTHONPATH=".;$V/checks" python g1_harness.py "$V/cps/CP.calculate_match.v1.md" \
     --impl a=rentmate_reference_impls.calculate_match_a \
     --impl b=rentmate_reference_impls.calculate_match_b
+
+# rebuild the Project Graph from the CP corpus (writes PG.rentmate.v1.json)
+python "$V/checks/build_rentmate_pg.py"
 ```
 
 `cp_tool.py validate` takes **file arguments**, not a directory.

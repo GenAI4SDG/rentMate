@@ -1,0 +1,92 @@
+{
+  "schema": "project_graph/v1",
+  "intent_id": "IP.rentmate.v1",
+  "coverage_declarations": [],
+  "facts": [
+    {
+      "id": "PF.CP.calculate_match.v1",
+      "intent_node": "IP.rentmate.compatibility",
+      "derived_from": [
+        "CP.calculate_match.v1"
+      ],
+      "dependent_cps": [
+        {
+          "id": "CP.calculate_match.v1",
+          "edit_tag_version": 1,
+          "content_sha256": "b951a1509051120d571b525fe91005b99f1bb7f28bd2f269d6ff1535723067ca"
+        }
+      ],
+      "retained_constraints": [
+        "deterministic weighted similarity over shared soft scalar factors only",
+        "weights frozen at v1 (all six equal)",
+        "a factor present on one side only is omitted and the rest renormalized, never imputed as 0",
+        "gender, MBTI, smoking, location, budget, amenities and size never contribute"
+      ],
+      "dropped_constraints": [],
+      "epistemic_outcome": "unknown",
+      "origin": "unstated",
+      "evidence": "",
+      "summary": "CP.calculate_match.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "metadata": {
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.calculate_match.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "reviewed_by_human": false
+      }
+    },
+    {
+      "id": "PF.CP.filter_eligible_matches.v1",
+      "intent_node": "IP.rentmate.compatibility",
+      "derived_from": [
+        "CP.filter_eligible_matches.v1"
+      ],
+      "dependent_cps": [
+        {
+          "id": "CP.filter_eligible_matches.v1",
+          "edit_tag_version": 1,
+          "content_sha256": "19e7e46736c026c61de853fd9bc44198e93a23b15ca9e88bd23d06bdf5e51dc6"
+        }
+      ],
+      "retained_constraints": [
+        "explicit hard constraints only; a missing or undisclosed value never satisfies a stated category",
+        "both directions must pass when both sides state a strict requirement",
+        "pure predicate: no I/O, no state, no retry"
+      ],
+      "dropped_constraints": [],
+      "epistemic_outcome": "unknown",
+      "origin": "unstated",
+      "evidence": "",
+      "summary": "CP.filter_eligible_matches.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "metadata": {
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.filter_eligible_matches.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "reviewed_by_human": false
+      }
+    },
+    {
+      "id": "PF.CP.validate_institution_email.v1",
+      "intent_node": "IP.rentmate.safety",
+      "derived_from": [
+        "CP.validate_institution_email.v1"
+      ],
+      "dependent_cps": [
+        {
+          "id": "CP.validate_institution_email.v1",
+          "edit_tag_version": 1,
+          "content_sha256": "4b6f1fdab498c145f23588f6ad10f326b2ba3ee1aae483ce0f26968bc8ed508d"
+        }
+      ],
+      "retained_constraints": [
+        "exact or dot-boundary domain match against a server-side allowlist; never substring",
+        "eligibility is not verification; the return carries no verified claim",
+        "pure and offline: the allowlist is configuration, not contract"
+      ],
+      "dropped_constraints": [],
+      "epistemic_outcome": "unknown",
+      "origin": "unstated",
+      "evidence": "",
+      "summary": "CP.validate_institution_email.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "metadata": {
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.validate_institution_email.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "reviewed_by_human": false
+      }
+    }
+  ]
+}
