@@ -26,19 +26,6 @@ begin
 end;
 $$;
 
-create or replace function public.is_admin()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  );
-$$;
-
 -- ---------------------------------------------------------------------------
 -- profiles
 -- ---------------------------------------------------------------------------
@@ -60,6 +47,20 @@ create index profiles_role_idx on public.profiles (role);
 create trigger profiles_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
+
+-- Must exist after profiles table (function body references public.profiles)
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'admin'
+  );
+$$;
 
 -- Auto-create profile on signup (email from auth.users)
 create or replace function public.handle_new_user()
