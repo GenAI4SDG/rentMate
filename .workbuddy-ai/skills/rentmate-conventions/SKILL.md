@@ -5,6 +5,17 @@ description: Project rules and conventions for RentMate, the Hong Kong student h
 
 # RentMate — Project Conventions
 
+> ### 🧪 Branch note — `AI-random-bs-go` only
+> This is a **solo methodology experiment** on an offshoot branch, not the team's
+> working branch. On this branch the md planning docs this skill references
+> (`PRD.md`, `TEAM-BRIEF.md`, `docs/site-spec-suite/`, `docs/build-plans.md`,
+> `docs/interim-report-reconciliation.md`, `docs/open-decisions.md`,
+> `docs/pitch-and-data-pack.md`, `HK_Rental_Platform_Master_Cursor_Spec.md`) were
+> **removed on purpose**, and the product spec lives in
+> **`vault/ips/IP.rentmate.v2.md`** (intent) + **`vault/cps/`** (contracts). On
+> `main` everything below still applies unchanged — restore any file with
+> `git checkout main -- <path>`. See `vault/NOTES.md`.
+
 > ### ⚠️ The interim report outranks every markdown file here
 > **`docs/GENAI SDG interim draft.pdf`** is the team-agreed statement of this project. Where any md file disagrees with it, the interim report wins. Change log: `docs/interim-report-reconciliation.md`.
 

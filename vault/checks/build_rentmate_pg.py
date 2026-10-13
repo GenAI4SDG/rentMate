@@ -21,7 +21,7 @@ import cp_tool                 # noqa: E402
 import project_graph as pg     # noqa: E402
 
 CPS_DIR = VAULT / "cps"
-OUT = VAULT / "PG.rentmate.v1.json"
+OUT = VAULT / "PG.rentmate.v2.json"
 
 # Constraints each CP RETAINS, read off the CP's frontmatter + body. Declared
 # here in one place (never inferred from prose), so the mapping is reviewable.
@@ -33,11 +33,12 @@ RETAINED = {
         "both directions must pass when both sides state a strict requirement",
         "pure predicate: no I/O, no state, no retry",
     ],
-    "CP.calculate_match.v1": [
+    "CP.calculate_match.v2": [
         "deterministic weighted similarity over shared soft scalar factors only",
-        "weights frozen at v1 (all six equal)",
+        "weights frozen at v2 (seven equal factors: the six soft scalars plus MBTI)",
+        "MBTI is a scored factor: value = 1 - differing_axes/4 over E/I, S/N, T/F, J/P",
         "a factor present on one side only is omitted and the rest renormalized, never imputed as 0",
-        "gender, MBTI, smoking, location, budget, amenities and size never contribute",
+        "gender, smoking, location, budget, amenities and size never contribute (gender/smoking are hard filters upstream)",
     ],
     "CP.validate_institution_email.v1": [
         "exact or dot-boundary domain match against a server-side allowlist; never substring",
@@ -88,7 +89,7 @@ def build() -> dict:
                       "reviewed_by_human": False},
         ))
 
-    graph = pg.ProjectGraph(intent_id="IP.rentmate.v1", facts=facts)
+    graph = pg.ProjectGraph(intent_id="IP.rentmate.v2", facts=facts)
 
     # coverage, resolved from the CP corpus the same way ip_tool.link does.
     assign: dict = {}

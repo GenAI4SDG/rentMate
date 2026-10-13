@@ -1,25 +1,26 @@
 # `vault/` — the RentMate planning artifacts
 
-This directory holds an **IP + CP artifact set** for RentMate, written to the
-conventions of the `coding_assistant` repo (`planning_graph`): same frontmatter
-schemas, same validators, same approval mechanics.
+An **IP + CP artifact set** for RentMate, written to the conventions of the
+`coding_assistant` repo (`planning_graph`): same frontmatter schemas, same
+validators, same approval mechanics.
 
-It was produced as a delegated, **non-formal** run. The owner asked for the
-artifacts to be written and **auto-approved by the agent**, without a human
-signature. That instruction is honoured literally — and its consequence is
-declared below rather than hidden.
+This is a **solo methodology run on an offshoot branch** (`AI-random-bs-go`). The
+object is to see how the IP → CP → PG → gate pipeline behaves on a real repo — not
+to contribute to the team's documents. The team's contradictory md docs were
+removed from this branch (see `NOTES.md` §5); the surviving primary sources are
+`docs/GENAI SDG interim draft.pdf` and the `Figma/` export. Nothing is lost —
+`main` still holds every file.
 
 ## What is here
 
 | Path | What it is |
 |---|---|
-| `ips/IP.rentmate.v1.md` | The intent tree: RentMate's four focuses, read from the interim report. **approved** (agent) |
-| `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate before scoring. **approved** (agent) |
-| `cps/CP.calculate_match.v1.md` | The deterministic weighted-similarity score. **approved** (agent) |
-| `cps/CP.validate_institution_email.v1.md` | The university-email eligibility check. **approved** (agent) |
-| `PG.rentmate.v1.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
-| `RECONCILIATION.md` | The three product statements + two codebases reconciled against the IP authority |
-| `checks/reconciliation_drift_check.py` | Re-verifies the reconciliation's settled rows; **exits non-zero when they rot** |
+| `ips/IP.rentmate.v2.md` | The intent tree: RentMate's four focuses + the owner's decisions (gender = hard filter, MBTI = scored, 12-question quiz). **approved** (agent) |
+| `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate (gender, smoking) before scoring. **approved** (agent) |
+| `cps/CP.calculate_match.v2.md` | The deterministic score; **MBTI is a scored factor**, gender is excluded. **approved** (agent) |
+| `cps/CP.validate_institution_email.v1.md` | The university-email access gate. **approved** (agent) |
+| `PG.rentmate.v2.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
+| `NOTES.md` | The agent's informal views: the drift it found, what the owner overruled, what the methodology is worth, and what was deleted |
 | `checks/rentmate_reference_impls.py` | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
 | `checks/build_rentmate_pg.py` | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
 
@@ -31,8 +32,8 @@ failed, the artifact would have been left `draft`.
 1. **Structural validity** — `ip_tool.py validate` / `cp_tool.py validate` report
    **0 hard findings**.
 2. **Link integrity** — `ip_tool.py link` reports no dangling, wrong-scope, or
-   duplicate node citations. Orphans are allowed and *reported*, because an orphan
-   is stated intent no CP refines yet, not an error.
+   duplicate node citations. Orphans are allowed and *reported*: an orphan is
+   stated intent no CP refines yet, not an error.
 3. **Oracle executability** — `g1_harness.py` runs two independently written
    formulations of each function against the CP's oracle: **both pass every case,
    with no disagreement**. (This proves the oracle is satisfiable; it is *not* a
@@ -80,7 +81,7 @@ comment above its `effects` block.
 
 ## The Project Graph, and one real finding about its schema
 
-`PG.rentmate.v1.json` holds three facts (one per CP), built by
+`PG.rentmate.v2.json` holds three facts (one per CP), built by
 `checks/build_rentmate_pg.py` from the CP corpus — never hand-typed, because a
 hand-typed PG could silently disagree with the corpus. It validates **0 hard / 0
 soft**, coverage is **ok**, staleness is **ok**.
@@ -106,18 +107,15 @@ From `coding_assistant/planning_graph/`, with the managed Python 3.13:
 
 ```bash
 V=C:/Users/Trinity/Programmes/GENAI_sdg/vault
-PYTHONPATH=. python ip_tool.py validate "$V/ips/IP.rentmate.v1.md"
+PYTHONPATH=. python ip_tool.py validate "$V/ips/IP.rentmate.v2.md"
 PYTHONPATH=. python cp_tool.py validate "$V"/cps/*.md
 PYTHONPATH=. python ip_tool.py link --ips "$V/ips" --cps "$V/cps"
-PYTHONPATH=".;$V/checks" python g1_harness.py "$V/cps/CP.calculate_match.v1.md" \
+PYTHONPATH=".;$V/checks" python g1_harness.py "$V/cps/CP.calculate_match.v2.md" \
     --impl a=rentmate_reference_impls.calculate_match_a \
     --impl b=rentmate_reference_impls.calculate_match_b
 
-# rebuild the Project Graph from the CP corpus (writes PG.rentmate.v1.json)
+# rebuild the Project Graph from the CP corpus (writes PG.rentmate.v2.json)
 python "$V/checks/build_rentmate_pg.py"
-
-# re-verify the reconciliation's settled findings (non-zero when one goes stale)
-python "$V/checks/reconciliation_drift_check.py"
 ```
 
 `cp_tool.py validate` takes **file arguments**, not a directory.

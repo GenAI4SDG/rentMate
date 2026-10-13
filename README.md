@@ -4,29 +4,29 @@
 
 Hackathon entry · Track 3: Smart Living, Culture & Belonging · SDG 11
 
-> ### ⚠️ The interim report is authoritative
-> **`docs/GENAI SDG interim draft.pdf`** is the team-agreed statement of this project. Where any markdown file disagrees with it, the interim report wins. Change log: `docs/interim-report-reconciliation.md`.
+> ### ⚠️ Branch note (`AI-random-bs-go`)
+> This is a **solo methodology experiment**, not the team's working branch. The
+> team's planning docs (`PRD.md`, `TEAM-BRIEF.md`, `docs/site-spec-suite/`, …) were
+> **removed here on purpose** — they had drifted into three contradictory statements
+> of the product, and this branch replaces them with a validated intent tree in
+> [`vault/`](vault/). **`main` still holds every removed file**; restore any with
+> `git checkout main -- <path>`.
+>
+> The surviving primary sources are the team-agreed interim report and the `Figma/`
+> export. See [`vault/NOTES.md`](vault/NOTES.md) for the reasoning.
 
 ---
 
 ## Start here
 
-Two documents. Everything else is reference.
-
 | If you want to... | Read |
 |---|---|
-| **Know the agreed position** — the team's interim report, which outranks everything else here | [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) |
-| **See what changed** when the md files were reconciled to it | [`docs/interim-report-reconciliation.md`](docs/interim-report-reconciliation.md) |
-| **Understand the product** — what we're building, for whom, what's in and out of scope, the GenAI split, the ethics rules | [`PRD.md`](PRD.md) |
-| **Know what to do next** — decisions already made, what's still open, your job, the calendar, setup | [`TEAM-BRIEF.md`](TEAM-BRIEF.md) |
-| See the full market research with sources | [`docs/hk-rental-partner-research.html`](docs/hk-rental-partner-research.html) |
-| See the judging scorecard and demo narrative | [`docs/rentmate-scope-lock.html`](docs/rentmate-scope-lock.html) |
-| See the longer-term strategy routes | [`docs/rentmate-implementation-methods.html`](docs/rentmate-implementation-methods.html) |
+| **Know the agreed position** — the team's interim report | [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) |
+| **Know what the product is meant to be** — the validated intent tree | [`vault/ips/IP.rentmate.v2.md`](vault/ips/IP.rentmate.v2.md) |
+| **See the agent's honest take** — the drift found, what was overruled, what was deleted | [`vault/NOTES.md`](vault/NOTES.md) |
+| **See the contracts** (deterministic functions, with test oracles) | [`vault/cps/`](vault/cps/) |
+| **Run the hackathon demo** | [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — start in the **`Figma/`** app |
 | Read the original deck and raw survey | [`docs/GenAI.pdf`](docs/GenAI.pdf) · [`docs/SURVEY.pdf`](docs/SURVEY.pdf) |
-
-**Reading order for a new teammate:** `PRD.md` §1–5 → `TEAM-BRIEF.md` §4 (your job) → `TEAM-BRIEF.md` §6 (setup). That is all you need to start.
-
-**Run the hackathon demo (judges / localhost):** [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — start in the **`Figma/`** app (`cd Figma && npm install && npm run dev`).
 
 **Key dates:** build + submission both **~18 October** · **code freeze 14 October**.
 
@@ -37,7 +37,7 @@ Two documents. Everything else is reference.
 - **Vite + React + TypeScript** ✅ (migrated 24 Sep, typecheck passing 25 Sep)
 - **Supabase** — Auth, Postgres, Edge Functions, pgvector for RAG
 - GenAI calls run in **Supabase Edge Functions** so API keys never reach the client
-- Chat and video are **not built in-house** — the app connects to **Google Meet**, with photo galleries and pre-recorded video walkthrough requests as alternatives
+- Chat and video are **not built in-house** — the app connects to **Google Meet**
 - **No deployment needed** — organisers accept localhost
 
 ## Getting started
@@ -57,7 +57,7 @@ npm install
 npm run dev
 ```
 
-**Supabase backend:** see [`backend/README.md`](backend/README.md) and [`docs/demo-user-guide.md`](docs/demo-user-guide.md).
+**Supabase backend:** see [`backend/README.md`](backend/README.md).
 
 ## Checks — run these before every commit
 
@@ -74,7 +74,7 @@ npm run build       # before each Friday demo
 This repo carries its own AI context. Open the repo folder in WorkBuddy and your session inherits it automatically:
 
 - **`.workbuddy-ai/memory/MEMORY.md`** — the shared project brain. Update it when you *decide* something, not just when you build something.
-- **`.workbuddy-ai/skills/rentmate-conventions/`** — our stack, conventions, ethics rules and scope lock. Auto-loads, so every teammate's assistant gives the same answers.
+- **`.workbuddy-ai/skills/rentmate-conventions/`** — our stack, conventions, ethics rules and scope lock.
 
 > ⚠️ Do not delete `.workbuddy-ai/`. It is project data, not a cache. It **is** committed to git (see `.gitignore`).
 
@@ -87,7 +87,3 @@ Remote: `https://github.com/GenAI4SDG/rentMate`
 - **One person per file** — AI tools edit files directly, so two people on one file collide
 - Tag a working demo every Friday: `git tag demo-w1`
 - `.env.example` is committed; `.env` is not
-
-## Organiser questions
-
-All ten were answered on 24 September — full table in [`TEAM-BRIEF.md`](TEAM-BRIEF.md) §3. Only the pitch-deck and interim-report requirements are still outstanding.

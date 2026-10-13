@@ -1,34 +1,35 @@
 {
   "schema": "project_graph/v1",
-  "intent_id": "IP.rentmate.v1",
+  "intent_id": "IP.rentmate.v2",
   "coverage_declarations": [],
   "facts": [
     {
-      "id": "PF.CP.calculate_match.v1",
+      "id": "PF.CP.calculate_match.v2",
       "intent_node": "IP.rentmate.compatibility",
       "derived_from": [
-        "CP.calculate_match.v1"
+        "CP.calculate_match.v2"
       ],
       "dependent_cps": [
         {
-          "id": "CP.calculate_match.v1",
-          "edit_tag_version": 1,
-          "content_sha256": "b951a1509051120d571b525fe91005b99f1bb7f28bd2f269d6ff1535723067ca"
+          "id": "CP.calculate_match.v2",
+          "edit_tag_version": 2,
+          "content_sha256": "5007793f6d107cb64203780b9ed635e861dfa6641aeb881a29e95ac740c708d8"
         }
       ],
       "retained_constraints": [
         "deterministic weighted similarity over shared soft scalar factors only",
-        "weights frozen at v1 (all six equal)",
+        "weights frozen at v2 (seven equal factors: the six soft scalars plus MBTI)",
+        "MBTI is a scored factor: value = 1 - differing_axes/4 over E/I, S/N, T/F, J/P",
         "a factor present on one side only is omitted and the rest renormalized, never imputed as 0",
-        "gender, MBTI, smoking, location, budget, amenities and size never contribute"
+        "gender, smoking, location, budget, amenities and size never contribute (gender/smoking are hard filters upstream)"
       ],
       "dropped_constraints": [],
       "epistemic_outcome": "unknown",
       "origin": "unstated",
       "evidence": "",
-      "summary": "CP.calculate_match.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "summary": "CP.calculate_match.v2 abstracted; feasibility not analysed (no Profiles, no measured workload)",
       "metadata": {
-        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.calculate_match.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.calculate_match.v2.md (frontmatter + body); no human reviewed the paraphrase",
         "reviewed_by_human": false
       }
     },

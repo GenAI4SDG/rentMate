@@ -66,7 +66,7 @@ def filter_eligible_matches_b(profile_a: Dict[str, Any], profile_b: Dict[str, An
 
 
 # --------------------------------------------------------------------------
-# CP.calculate_match.v1
+# CP.calculate_match.v2   (MBTI is a scored factor; gender is NOT scored)
 # --------------------------------------------------------------------------
 
 SOFT_FACTORS = (
@@ -74,22 +74,36 @@ SOFT_FACTORS = (
     "noise_preference", "personal_space_preference", "bill_splitting_style",
 )
 
+# The four MBTI axis pairs, in position order (E/I, S/N, T/F, J/P).
+_AXES = ("IE", "SN", "TF", "JP")
+
+
+def _wellformed_mbti(t: Any) -> bool:
+    return (isinstance(t, str) and len(t) == 4
+            and all(t[i].upper() in _AXES[i] for i in range(4)))
+
 
 def calculate_match_a(profile_a: Dict[str, Any], profile_b: Dict[str, Any]) -> Dict[str, Any]:
     am, bm = profile_a.get("about_me") or {}, profile_b.get("about_me") or {}
-    shared = [f for f in SOFT_FACTORS if f in am and f in bm]
-    if not shared:
+    vals = [1 - abs(am[f] - bm[f]) for f in SOFT_FACTORS if f in am and f in bm]
+    ta, tb = profile_a.get("mbti_type"), profile_b.get("mbti_type")
+    if _wellformed_mbti(ta) and _wellformed_mbti(tb):
+        differing = sum(1 for i in range(4) if ta[i] != tb[i])
+        vals.append(1 - differing / 4)
+    if not vals:
         return {"score": None, "status": "insufficient_data"}
-    total = sum(1.0 * (1 - abs(am[f] - bm[f])) for f in shared)
-    return {"score": round(100 * total / len(shared)), "status": "scored"}
+    return {"score": round(100 * sum(vals) / len(vals)), "status": "scored"}
 
 
 def calculate_match_b(profile_a: Dict[str, Any], profile_b: Dict[str, Any]) -> Dict[str, Any]:
     am, bm = profile_a.get("about_me") or {}, profile_b.get("about_me") or {}
-    common = set(SOFT_FACTORS) & set(am) & set(bm)
-    if not common:
+    common = sorted(set(SOFT_FACTORS) & set(am) & set(bm))
+    sims = [1 - abs(am[f] - bm[f]) for f in common]
+    ta, tb = profile_a.get("mbti_type"), profile_b.get("mbti_type")
+    if _wellformed_mbti(ta) and _wellformed_mbti(tb):
+        sims.append(1 - sum(1 for i in range(4) if ta[i] != tb[i]) / 4)
+    if not sims:
         return {"score": None, "status": "insufficient_data"}
-    sims = [1 - abs(am[f] - bm[f]) for f in sorted(common)]
     return {"score": int(round(100 * sum(sims) / len(sims))), "status": "scored"}
 
 
