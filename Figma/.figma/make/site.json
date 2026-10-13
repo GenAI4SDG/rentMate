@@ -1,0 +1,10 @@
+{
+  "description": "Connects individuals seeking roommates, facilitating compatibility matching based on preferences and lifestyle for a harmonious living experience.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

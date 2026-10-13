@@ -1,0 +1,12 @@
+{
+  "name": "rentmate-backend",
+  "private": true,
+  "description": "Supabase schema, migrations, and Edge Functions for rentMate HK rental platform",
+  "scripts": {
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "functions:serve": "supabase functions serve --env-file .env.local"
+  }
+}

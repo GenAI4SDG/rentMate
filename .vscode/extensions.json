@@ -1,0 +1,4 @@
+{
+  "recommendations": ["supabase.vscode-supabase-extension"],
+  "unwantedRecommendations": ["ms-mssql.mssql"]
+}
