@@ -1,5 +1,31 @@
 # Project Memory — RentMate (HK rental / roommate matching)
 
+## 🧪 Offshoot branch `AI-random-bs-go` — solo methodology run (2026-10-13)
+
+> **This section applies to the `AI-random-bs-go` branch only.** Everything below
+> it is the team's `main` state and still holds on `main`. On the offshoot branch
+> the md planning docs were **removed on purpose** (they had drifted into three
+> contradictory statements of the product) and replaced with a validated intent
+> tree in `vault/`. `main` still holds every removed file.
+
+**What the offshoot holds:** `vault/ips/IP.rentmate.v2.md` (intent) +
+`vault/cps/*` (contracts) + `vault/PG.rentmate.v2.json` (built from the corpus) +
+`vault/NOTES.md` (informal reasoning). Full record: `.workbuddy-ai/memory/2026-10-13.md`.
+
+**Owner decisions that overruled the docs** (these are the substantive calls):
+- **Gender is a HARD filter** — gates candidates before scoring, never enters the score.
+- **MBTI is a SOFT scoring preference** — scored factor `1 - differing_axes/4`, elicited via lifestyle questions.
+- **12 questions** is the demo boundary (report spec 22; earlier demo 7).
+- **Do not build on Figma.**
+- **U6 open:** Figma vs the root Vite app, and its hosting consequence.
+
+**Removed here** (restore with `git checkout main -- <path>`): `PRD.md`,
+`TEAM-BRIEF.md`, `HK_Rental_Platform_Master_Cursor_Spec.md`, `docs/build-plans.md`,
+`docs/interim-report-reconciliation.md`, `docs/open-decisions.md`,
+`docs/pitch-and-data-pack.md`, `docs/v0-mvp-prompt.md`, `docs/site-spec-suite/`.
+
+---
+
 ## ⚠️ THE AUTHORITY: the interim report (1 October 2026)
 
 **`docs/GENAI SDG interim draft.pdf`** is the team-reviewed, team-agreed statement of this project. **It outranks every markdown file in this repo.** On 1 October every md file was reconciled to it and conflicting content was removed. Change log: **`docs/interim-report-reconciliation.md`**.
