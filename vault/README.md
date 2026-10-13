@@ -19,6 +19,7 @@ declared below rather than hidden.
 | `cps/CP.validate_institution_email.v1.md` | The university-email eligibility check. **approved** (agent) |
 | `PG.rentmate.v1.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
 | `RECONCILIATION.md` | The three product statements + two codebases reconciled against the IP authority |
+| `checks/reconciliation_drift_check.py` | Re-verifies the reconciliation's settled rows; **exits non-zero when they rot** |
 | `checks/rentmate_reference_impls.py` | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
 | `checks/build_rentmate_pg.py` | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
 
@@ -114,6 +115,9 @@ PYTHONPATH=".;$V/checks" python g1_harness.py "$V/cps/CP.calculate_match.v1.md" 
 
 # rebuild the Project Graph from the CP corpus (writes PG.rentmate.v1.json)
 python "$V/checks/build_rentmate_pg.py"
+
+# re-verify the reconciliation's settled findings (non-zero when one goes stale)
+python "$V/checks/reconciliation_drift_check.py"
 ```
 
 `cp_tool.py validate` takes **file arguments**, not a directory.
