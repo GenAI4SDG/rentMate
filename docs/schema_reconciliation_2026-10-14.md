@@ -6,10 +6,10 @@
 **Trigger:** owner — *"review the schema based on docs/ (pdf sources, before Oct 1st) — it's probably about as authoritative as the pdf I gave you before."*
 
 **Scope of this doc:** reconcile the current backend schema
-(`backend/supabase/migrations/20261013233000_roommate_matching.sql`) and the
+([`backend/supabase/migrations/20261013233000_roommate_matching.sql`](../backend/supabase/migrations/20261013233000_roommate_matching.sql)) and the
 planned auth-free chat schema (tasks #23–#27) against the authoritative
 pre-Oct-1 `docs/` sources **and** the frozen RentMate IP/CP contracts
-(`GENAI_sdg/vault/ips/IP.rentmate.v2.md`, `vault/cps/CP.*`). Note: those
+([`vault/ips/IP.rentmate.v2.md`](../vault/ips/IP.rentmate.v2.md), `vault/cps/CP.*`). Note: those
 contracts are themselves a *separate* methodology experiment on this offshoot
 branch — used here only as a frozen spec, not as product code (see the companion
 framework-usefulness report).
@@ -20,13 +20,13 @@ framework-usefulness report).
 
 | Source | Type | What it establishes |
 |---|---|---|
-| `GenAI.pdf` | program brief | 3 candidate solutions (A MatchFirst / B TrustFirst / C AllInOne); **"What You're NOT Building"** scope-control page |
-| `SURVEY.pdf` | 41-respondent survey (20/09/2026) | trust verification is the #1 validated need; chat is a weak/optional ask |
-| `rentmate-scope-lock.html` | 23 Sep 2026 | **strongest** calls: verification is THE product; GenAI must be load-bearing; 3D already cut; seeded profiles acknowledged |
-| `rentmate-implementation-methods.html` | — | PCV 18/24, 4 selling points, verification #1 (73%/68% survey) |
-| `hk-rental-partner-research.html` | Sep 2026 | HK is a *matching* problem; fraud concentrated in cheap/direct channels; student bed shortfall |
-| `demo-user-guide.md` | — | **stale**: "no login required", 7 questions, local demo — superseded |
-| `GENAI SDG interim draft.pdf` | team-agreed authority | relies on prior extraction + `vault/README.md` characterization |
+| [`GenAI.pdf`](GenAI.pdf) | program brief | 3 candidate solutions (A MatchFirst / B TrustFirst / C AllInOne); **"What You're NOT Building"** scope-control page |
+| [`SURVEY.pdf`](SURVEY.pdf) | 41-respondent survey (20/09/2026) | trust verification is the #1 validated need; chat is a weak/optional ask |
+| [`rentmate-scope-lock.html`](rentmate-scope-lock.html) | 23 Sep 2026 | **strongest** calls: verification is THE product; GenAI must be load-bearing; 3D already cut; seeded profiles acknowledged |
+| [`rentmate-implementation-methods.html`](rentmate-implementation-methods.html) | — | PCV 18/24, 4 selling points, verification #1 (73%/68% survey) |
+| [`hk-rental-partner-research.html`](hk-rental-partner-research.html) | Sep 2026 | HK is a *matching* problem; fraud concentrated in cheap/direct channels; student bed shortfall |
+| [`demo-user-guide.md`](demo-user-guide.md) | — | **stale**: "no login required", 7 questions, local demo — superseded |
+| [`GENAI SDG interim draft.pdf`](GENAI%20SDG%20interim%20draft.pdf) | team-agreed authority | relies on prior extraction + [`vault/README.md`](../vault/README.md) characterization |
 
 ### 1a. The load-bearing points from those sources
 - **GenAI.pdf scope-control page** explicitly cuts: *3D room reconstruction*
@@ -51,7 +51,7 @@ framework-usefulness report).
 
 ## 2. Current schema state (as written)
 
-`20261013233000_roommate_matching.sql` defines:
+[`20261013233000_roommate_matching.sql`](../backend/supabase/migrations/20261013233000_roommate_matching.sql) defines:
 
 - `student_verifications(user_id uuid → auth.users, email_domain, institution, verified bool, created_at)` + `unique(user_id, email_domain)`
 - `roommate_profiles(user_id uuid → auth.users PK, display_name, school, about_me jsonb, looking_for jsonb, gender_identity enum, mbti_type, area text, budget_min/max, …)` + `set_updated_at` trigger
@@ -60,7 +60,7 @@ framework-usefulness report).
 - `calculate_match_score(a jsonb, b jsonb)` — SQL mirror of `CP.calculate_match.v2`
 - RLS **enabled** on all four tables, with `auth.uid()` / `auth.role() = 'authenticated'` policies.
 
-**Verified mismatch with the app.** `Figma/src/lib/api.ts` `saveProfile`
+**Verified mismatch with the app.** [`Figma/src/lib/api.ts`](../Figma/src/lib/api.ts) `saveProfile`
 (`supabase.from("roommate_profiles").upsert({…})`, line 122) sends the fields
 `belief_system`, `campus_district`, `target_areas[]`, `interests[]` (lines
 127–133). **None of these exist as columns in the migration.** Conversely the
@@ -68,7 +68,7 @@ migration carries `area text` and `school text` that the app does not populate.
 So the migration is out of sync with the app's profile shape in **both**
 directions.
 
-Also verified: `api.ts` contains **no** insert into `student_verifications` and
+Also verified: [`api.ts`](../Figma/src/lib/api.ts) contains **no** insert into `student_verifications` and
 **no** `messages`/`conversation_id` usage — confirming the verification table is
 currently orphaned and real chat (#23–#27) is not yet backed by Supabase.
 
@@ -80,8 +80,8 @@ currently orphaned and real chat (#23–#27) is not yet backed by Supabase.
 |---|------|---------------------|---------------|-----|----------------|
 | **D1** | Auth model | owner: *"email = identity, no password"*; GenAI.pdf originally had password + card | migration FK `auth.users` on every table | **High** | rewrite PKs to `text` (=email); drop FK |
 | **D2** | Profile columns | app needs `campus_district` / `target_areas[]` / `interests[]` / `belief_system` | migration lacks them; has unused `area` / `school` | **High** | add the 4 columns; decide on `area`/`school` |
-| **D3** | `student_verifications` | scope-lock: *"store the verification result only — a boolean plus institution and timestamp"* | table defined but `api.ts` never writes it | Med | populate on domain gate **or** drop |
-| **D4** | Score dual-source | `CP.calculate_match.v2` is the frozen canonical; scope-lock: *"demote matching to honest role"* | client `matching.ts` + SQL `calculate_match_score` + edge fn all score; AI-off → deterministic narrative | Med | pick one canonical (client); document the rest |
+| **D3** | `student_verifications` | scope-lock: *"store the verification result only — a boolean plus institution and timestamp"* | table defined but [`api.ts`](../Figma/src/lib/api.ts) never writes it | Med | populate on domain gate **or** drop |
+| **D4** | Score dual-source | `CP.calculate_match.v2` is the frozen canonical; scope-lock: *"demote matching to honest role"* | client [`matching.ts`](../Figma/src/lib/matching.ts) + SQL `calculate_match_score` + edge fn all score; AI-off → deterministic narrative | Med | pick one canonical (client); document the rest |
 | **D5** | Quiz spec | GenAI.pdf: 22 Q weighted + formula | app: 12 Q; IP/CP: 6 equal-weight + MBTI renormalized | Low | map 12Q → IP/CP factors in code; note supersession |
 | **D6** | Simulated 360 "tour" | scope-lock: *"3D reconstruction ALREADY CUT"*; brief: *"3D too complex → photo analysis"* | `App.tsx:1633–1707` draggable **flat stock photo** "360 view" w/ fabricated dims; pulls Unsplash at runtime | Low–Med | remove **or** watermark "illustrative only" |
 | **D7** | Real-time chat | GenAI.pdf: *"chat → link out"*; survey chat weak (11/41) | owner chose **real** chat (Supabase Realtime) — #23–#27 | Low | keep (intentional) + note no moderation |
@@ -105,7 +105,7 @@ fails closed. Fix is bundled with D9 in the rewrite below.
 `roommate_profiles` has none of these; it has `area` and `school` instead. When
 the Supabase persistence path is live, `upsert` with unknown columns will error.
 (The app's district-based commute model — `campus_district` → `target_areas` →
-`DISTRICT_COORDS` in `matching.ts` — is sound and matches the market-research
+`DISTRICT_COORDS` in [`matching.ts`](../Figma/src/lib/matching.ts) — is sound and matches the market-research
 "location-selective" insight, but the migration doesn't persist it.)
 
 **D3 — Orphaned verification table.** The shape (`verified bool` + `institution`
@@ -123,7 +123,7 @@ drift. AI is **off** (deterministic `NARRATIVE_FALLBACK`, `scored_with_model:fal
 so the "GenAI narrative" the contract assumed (`F5`, *"never cut"*) is gone — a
 post-contract owner decision (see framework report §3.2).
 
-**D5 — Quiz count divergence.** `demo-user-guide.md` says 7 (stale); the app has
+**D5 — Quiz count divergence.** [`demo-user-guide.md`](demo-user-guide.md) says 7 (stale); the app has
 12; the brief specifies 22 with fixed weights. The IP/CP set **supersedes** the
 brief's weighted scheme with 6 equal-weight factors + MBTI renormalized
 (`CP.calculate_match.v2`). The 12-question quiz should be explicitly mapped (in
@@ -240,7 +240,7 @@ alter table public.messages              disable row level security;
 - **Q2 (D7):** Confirm real in-app chat for the submission narrative (it goes
   beyond the brief's "link out" default).
 - **Q3 (D1/D9):** Approve the auth-free schema rewrite + RLS-off decision?
-- **Q4 (D5):** Annotate the 12-question quiz in `quiz.ts` with its IP/CP factor
+- **Q4 (D5):** Annotate the 12-question quiz in [`quiz.ts`](../Figma/src/lib/quiz.ts) with its IP/CP factor
   mapping?
 - **Q5 (D3):** Populate `student_verifications` on domain gate, or drop it?
 
@@ -252,8 +252,8 @@ alter table public.messages              disable row level security;
 |---|---|---|
 | #23 schema migration rewrite | D1, D2, D3, D9, D10 | pending (needs Q3) |
 | #24 `messages` Edge Function | D10 | pending |
-| #25 `api.ts` email identity / real-user matching / chat I/O | D1, D7, D10 | pending |
-| #26 `App.tsx` Realtime wiring | D7 | pending |
+| #25 [`api.ts`](../Figma/src/lib/api.ts) email identity / real-user matching / chat I/O | D1, D7, D10 | pending |
+| #26 [`App.tsx`](../Figma/src/App.tsx) Realtime wiring | D7 | pending |
 | #27 tsc + build green + docs update | all + honesty ledger | pending |
 | NEW — D6 tour decision | D6 | pending (needs Q1) |
 | NEW — D5 quiz annotation | D5 | pending (needs Q4) |

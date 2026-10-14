@@ -7,12 +7,12 @@
 # (`AI-random-bs-go`): the object of the exercise is to see how the
 # IP -> CP -> PG -> gate pipeline behaves on a real project, not to contribute
 # to the team's documents. The contradictory md docs the v1 draft reconciled
-# against have been REMOVED from this branch (see `vault/NOTES.md`); the
-# surviving primary sources are `docs/GENAI SDG interim draft.pdf` and the
+# against have been REMOVED from this branch (see [`vault/NOTES.md`](../NOTES.md)); the
+# surviving primary sources are [`docs/GENAI SDG interim draft.pdf`](../../docs/GENAI%20SDG%20interim%20draft.pdf) and the
 # `Figma/` export.
 #
 # The G-8 human boundary was NOT exercised; the owner waived the signature and
-# told the agent to auto-approve. That gap is declared in `vault/README.md`,
+# told the agent to auto-approve. That gap is declared in [`vault/README.md`](../README.md),
 # never papered over.
 # ============================================================================
 ip_version: 1
@@ -86,7 +86,7 @@ approval:
 
 > "**RentMate** — Roommate matching and affordable housing for students in Hong Kong
 > — helping non-local students settle in quickly, with compatible roommates and no
-> agency fee worth a month's rent." — `README.md`
+> agency fee worth a month's rent." — [`README.md`](../../README.md)
 
 > "**The four focuses, in order:** compatibility · affordability · transparency ·
 > safety (trust and privacy). **Listing verification is ruled out.**" — interim report

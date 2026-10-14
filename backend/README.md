@@ -1,71 +1,110 @@
-# rentMate — Supabase backend
+# rentMate — backend
 
-Hong Kong rental platform backend aligned with `HK_Rental_Platform_Master_Cursor_Spec.md` (Phase 1 foundation: schema, RLS, storage, auth hooks; Edge Function stubs for AI phases).
+Supabase project for RentMate: the database the app talks to, plus reference
+Edge Functions that are **not** called by the running product.
 
-## Prerequisites
+> **Setting up a database?** Read [`supabase/SETUP.md`](supabase/SETUP.md) — it is
+> the single source of truth for schema, migrations, the RLS position and the
+> troubleshooting table. This file only describes the folder layout.
 
-- [Supabase CLI](https://supabase.com/docs/guides/cli) (`brew install supabase/tap/supabase`)
-- Docker (for `supabase start` local stack)
-- A Supabase project (cloud) or local CLI stack
+---
 
-## Quick start (local)
+## What this backend is
 
-```bash
-cd backend
-supabase start
-supabase db reset   # applies migrations + seed
-```
+The app uses **Postgres and Realtime only**, reached directly from the browser
+with the anon key. There is **no server process** to run and **no API layer** to
+deploy.
 
-After start, the CLI prints `API URL`, `anon key`, and `service_role key`. Use them in your frontend or Next.js app:
+| | |
+| --- | --- |
+| **Account key** | The user's **email**. No Supabase Auth, no password, no OTP, no session |
+| **Identity check** | A client-side domain allowlist (`Figma/src/lib/institutions.ts`). A UX affordance, not a security control |
+| **Row Level Security** | **Disabled** on every table — with no `auth.users` there is no `auth.uid()` to key a policy on |
+| **Realtime** | `messages` (and the Homes tables) are in the `supabase_realtime` publication |
+| **GenAI** | No model is called anywhere in the shipped app |
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from supabase start>
-SUPABASE_SERVICE_ROLE_KEY=<service_role key>
-OPENAI_API_KEY=
-MAPBOX_ACCESS_TOKEN=
-```
+**The RLS consequence, stated plainly:** anyone holding the anon key — which ships
+inside the JavaScript bundle — can read and write **every** row, including other
+users' saved homes and messages. Acceptable only because all data is synthetic.
+Not acceptable the moment a real student's details are in there. See the closing
+section of [`supabase/SETUP.md`](supabase/SETUP.md) before this ever points at
+real people.
 
-## Cloud project
-
-```bash
-cd backend
-supabase link --project-ref <your-project-ref>
-supabase db push
-supabase functions deploy analyze-agreement
-supabase functions deploy rental-chatbot
-```
-
-Enable **Email** and **Google** providers in Authentication → Providers. Turn on **Confirm email** for the verify-email requirement in the spec.
+---
 
 ## Layout
 
 | Path | Purpose |
-|------|---------|
-| `supabase/migrations/` | PostgreSQL schema, RLS, storage, seeds |
-| `supabase/functions/analyze-agreement/` | Agreement upload review pipeline (Phase 5 stub) |
-| `supabase/functions/rental-chatbot/` | HK rental assistant (Phase 5 stub) |
-| `src/types/database.ts` | Generated-style TypeScript shapes for clients |
+| --- | --- |
+| `supabase/migrations/` | The schema. **Five files, run in order** — see `SETUP.md` |
+| `supabase/functions/compatibility/` | Reference implementation of the match narrative. **Not called at runtime** — scoring happens client-side |
+| `supabase/functions/analyze-agreement/` | Agreement-review pipeline. Stub, unused |
+| `supabase/functions/rental-chatbot/` | HK rental assistant. Stub, unused |
+| `supabase/functions/_shared/` | CORS helper for the above |
+| `scripts/check-live-schema.mjs` | Read-only probe: does the live project match these migrations? |
+| `src/types/database.ts` | Hand-maintained types |
+| `.env.local` | For `supabase functions serve` only — **the web app does not read this file** |
 
-## API surface
+### `src/types/database.ts` is stale
 
-Clients should prefer **Supabase client + RLS** for CRUD. The master spec also lists REST-style routes (`/api/properties`, etc.); implement those in Next.js Route Handlers that call the same tables with the user's JWT, or use PostgREST filters directly from the browser where RLS allows.
+It mirrors the **original auth-based schema** (`Profile` with `id`, `full_name`,
+`phone`, `avatar_url`), which is not what the app uses. The app's real types live
+in `Figma/src/lib/` (`Profile`, `Listing`, `PersonalState`). Regenerate or delete
+this file rather than trusting it.
 
-### Property search (PostgREST)
+---
 
-Active listings: `properties` where `status = 'active'`, with filters on `district`, `monthly_rent`, `bedrooms`, `bathrooms`, `property_type`, and full-text on `title_en` / `title_zh`. Pagination: `range(0, 19)` for 20 rows. Sort via `order('created_at', { ascending: false })`.
+## Running the database locally
 
-### Realtime
+Requires the Supabase CLI and Docker:
 
-Subscribe to `messages` and `notifications` for chat and alerts (`supabase.channel(...).on('postgres_changes', ...)`).
+```bash
+cd backend
+supabase start
+supabase db reset     # applies all migrations + seed
+```
 
-## Roommate matching (rentMate product)
+`supabase start` prints the API URL and keys. To point the app at it, put those
+in **`Figma/.env.local`** — not here:
 
-The Figma demo uses a separate roommate flow (`docs/site-spec-suite/database-schema.md`). Those tables are **not** in this HK rental spec migration set. Add a follow-up migration (e.g. `student_verifications`, `quiz_answers`) when you wire the matching feature to this backend.
+```
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=<anon key from supabase start>
+```
 
-## Security checklist
+> **The `VITE_` prefix is required.** Vite silently ignores `NEXT_PUBLIC_*` names,
+> so the app falls back to local mode with no error at all. This file used to
+> instruct `NEXT_PUBLIC_*`, which is exactly how that bug reached the app once.
 
-- RLS enabled on every public table
-- Service role key only on server / Edge Functions
-- Storage policies scoped by bucket and `auth.uid()`
-- Rate limiting for Edge Functions and Next.js API routes (configure at gateway / middleware in the app layer)
+---
+
+## Cloud project
+
+```bash
+cd backend/supabase
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+Then verify it actually landed — a migration runner reporting no error is not
+proof, because `create table if not exists` silently skips a same-named table of
+a different shape:
+
+```bash
+node backend/scripts/check-live-schema.mjs
+```
+
+**Do not enable an auth provider.** There is no auth model here; turning on
+Email or Google sign-in does nothing except add confusion. If you want real
+accounts later, add Supabase Auth *and* write RLS policies keyed on the email
+claim — do not retrofit `auth.uid()` onto this schema.
+
+---
+
+## Related documents
+
+| Document | Purpose |
+| --- | --- |
+| [`supabase/SETUP.md`](supabase/SETUP.md) | Setup, schema drift, RLS position, troubleshooting |
+| [`../docs/HOSTING.md`](../docs/HOSTING.md) | Deploying the app and what breaks |
+| [`../README.md`](../README.md) | Project overview |

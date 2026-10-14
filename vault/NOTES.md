@@ -20,7 +20,7 @@ be re-derived on `main`, not trusted because it is written down here.
 
 The project had **three incompatible statements of itself**, all committed:
 
-1. the **interim report** (`docs/GENAI SDG interim draft.pdf`) — team-agreed, and  
+1. the **interim report** ([`docs/GENAI SDG interim draft.pdf`](../docs/GENAI%20SDG%20interim%20draft.pdf)) — team-agreed, and  
    the one the owner treats as authority;
 2. the **`docs/site-spec-suite/` draft** — unratified, and it quietly added an  
    in-app chat and a *strict gender filter* that the report does not mention;
@@ -116,6 +116,12 @@ open question (U9) rather than rounding it down to "about twelve". **The one
 thing a methodology run must never do is quietly redefine the owner's number to
 match the artifact.**
 
+> **14 Oct 2026 — the compression did not hold.** The owner's own review passes
+> added six questions back (`roommate_count`, `must_haves`, `cook_at_home`,
+> `about_you_line`, `study_year`, `major`) and reframed `room_size` as
+> `flat_size`. The build is **20** again. The v3 compression above stands as the
+> record of what was attempted; U9 carries the current number.
+
 ## 5. Why I deleted things, and what survived
 
 The owner said the md docs could go. On this branch they are gone, because leaving  
@@ -131,10 +137,10 @@ plus this run's own superseded `vault/RECONCILIATION.md` and its drift check.
 
 **Kept** — the primary sources and anything practical:
 
-- `docs/GENAI SDG interim draft.pdf` — the team-agreed authority;
+- [`docs/GENAI SDG interim draft.pdf`](../docs/GENAI%20SDG%20interim%20draft.pdf) — the team-agreed authority;
 - `Figma/` — the team-agreed UI source, untouched;
-- the other PDFs (`GenAI.pdf`, `SURVEY.pdf`) and the research HTML;
-- `README.md`, `docs/demo-user-guide.md`, the app + backend code, `.workbuddy-ai/`.
+- the other PDFs ([`GenAI.pdf`](../docs/GenAI.pdf), [`SURVEY.pdf`](../docs/SURVEY.pdf)) and the research HTML;
+- [`README.md`](../README.md), [`docs/demo-user-guide.md`](../docs/demo-user-guide.md), the app + backend code, `.workbuddy-ai/`.
 
 ## 6. Honest caveats
 
@@ -168,21 +174,25 @@ plus this run's own superseded `vault/RECONCILIATION.md` and its drift check.
 - **U8 — the client-side domain gate is not a security control.** It is a UX
   affordance; any allowlisted address passes, including one that is not the
   answerer's.
-- **U9 — the quiz is 14, not the owner's 12.** See §4b.
-- **U6 — Figma vs the root app, and the hosting consequence.** The team never  
-  concluded this. It matters because the root app is a Vite SPA: presenting it  
-  on-screen from a laptop means either `npm run dev` locally or **hosting it**  
-  (e.g. Vercel) so the link opens anywhere. This is the owner's call, not the  
-  methodology's — flagged, not decided.
+- **U9 — the quiz is 20, not the owner's 12.** v3 compressed it 20 → 14 (see
+  §4b); the owner's review passes of 14 Oct then added six questions back
+  (`roommate_count`, `must_haves`, `cook_at_home`, `about_you_line`,
+  `study_year`, `major`) and reframed `room_size` as `flat_size`. Eight over the
+  boundary, stated rather than rounded down.
+- **U6 — Figma vs the root app, and the hosting consequence. RESOLVED 14 Oct 2026.**
+  The product is the **`Figma/`** app; the root Vite shell is a placeholder. The
+  hosting question the team never concluded is now answered by the submission
+  requirement itself: the deck must carry a clickable link, so a public URL is
+  mandatory, and the deploy is static. See [`docs/HOSTING.md`](../docs/HOSTING.md).
 - **The 66% / 68% figures.** The report's headline percentages are the same survey  
   items earlier drafts logged as detractor counts (27/41, 28/41). Worth checking the  
-  wording in `docs/SURVEY.pdf` before either goes on a slide.
+  wording in [`docs/SURVEY.pdf`](../docs/SURVEY.pdf) before either goes on a slide.
 - **`matchedFactors` / `frictionFactors` semantics.** The contracts deliberately do  
   not pin whether "matched" means *agreed* or *considered*. Someone should.
 - **What the pitch may honestly claim.** With no model running and no stored
   verification, "AI-powered matching" and "verified students" are both false as
-  written. The defensible claims are: a deterministic score you can inspect, seven
-  explicit eligibility filters the user can see working, in-app chat with report
-  and block, and no agency fee. Someone should decide which of those is the
-  headline before the deck is written.
+  written. The defensible claims are: a deterministic score you can inspect, five
+  explicit eligibility filters the user can see working (each applied in both
+  directions), in-app chat with report and block, and no agency fee. Someone
+  should decide which of those is the headline before the deck is written.
 

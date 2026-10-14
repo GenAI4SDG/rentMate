@@ -38,11 +38,14 @@ percentage.
 - **No grid, no swipe.** Each match is a one-card "hook deck": one real thing you
   two share, plus reaction buttons (*wait, rlly?!* / *same* / *pass*) that seed a
   cached conversation.
-- **Seven hard filters run before scoring and are shown.** Gender/identity,
-  belief system, target area, commute limit from your campus, budget, room size,
-  and smoking gate candidates. The app explicitly tells you **who it hid and
+- **Five hard filters run before scoring and are shown.** Gender/identity,
+  belief system, commute limit from your campus, budget, and smoking gate
+  candidates — each applied in **both directions**, so your requirement can hide
+  someone and theirs can hide you. The app explicitly tells you **who it hid and
   why** — the part most apps hide. Every hard question carries an explicit
   "no preference" option, and an unanswered filter never silently rejects.
+  **Flat size is not a gate**: a conflicting preference warns at the point a home
+  is suggested rather than hiding a person.
 - **Soft compatibility (lifestyle + MBTI) is scored but never gates.** Conflated,
   as decided.
 - **Chat is inside the app, and only inside the app.** Real, persisted,
@@ -61,11 +64,17 @@ percentage.
    everything after. No sign-up, no password, no OTP. *Domain-only* — see §7.
    Returning users are recognised by that email: their saved row is reloaded on
    mount, so they land straight in the workspace rather than re-taking the quiz.
-2. **Quiz** — **14 questions** build a profile. Two composite soft questions
-   cover all six lifestyle scalars; two composite "how you think" questions
-   infer MBTI from behaviour; one question seeds the icebreaker vocabulary; and
-   **nine are eligibility filters** (gender identity + preference, belief system
-   + preference, target areas, commute, budget, room size, smoking).
+2. **Quiz** — **20 questions** build a profile: four soft questions (two
+   composite lifestyle, two composite "how you think" that infer MBTI from
+   behaviour), three bonding questions that seed the icebreaker vocabulary and
+   the household maths, two **display-only** questions (`study year`, `major` —
+   never scored, never gating), and eleven that shape the constraints: gender
+   identity and preference, belief system and preference, target areas, commute,
+   budget, smoking, roommates wanted, flat size and must-haves.
+   **Five of those are hard gates** — gender, belief, smoking, commute and
+   budget, each applied in both directions. Room size is deliberately **not**
+   one: a conflicting flat-size preference raises a warning instead of hiding
+   someone — see §7.
 3. **Matches** — hard gate → deterministic score (0–100) → icebreaker hooks +
    cached narrative. Plus a per-district neighbourhood guide and a
    "before you sign" safety list, both cited.
@@ -83,9 +92,9 @@ percentage.
   project.
 - **Backend:** Supabase — Postgres + Realtime only. **No Supabase Auth, no Edge
   Function in the running path.** The score is computed **client-side** in
-  `lib/matching.ts`; `calculate_match_score` survives in SQL purely as a
+  [`lib/matching.ts`](Figma/src/lib/matching.ts); `calculate_match_score` survives in SQL purely as a
   reference mirror of the contract and is never invoked.
-- **RLS is disabled** on all four tables, because with no `auth.users` there is
+- **RLS is disabled** on all eight tables, because with no `auth.users` there is
   no `auth.uid()` to key a policy on and an enabled policy would block every
   row. Stated as a limitation, not hidden — see §10.
 - **Local fallback:** with no Supabase project configured, **everything** (score,
@@ -96,10 +105,12 @@ percentage.
 
 ## 6. Design decisions worth challenging
 
-- **HARD vs SOFT split.** HARD: gender/identity, belief, target area, commute,
-  room size, budget, smoking. SOFT / conflated: the six lifestyle scalars +
-  MBTI. (Owner's call. An earlier v1 *forbade* MBTI from scoring; v2 adds it as
-  one of seven equal-weight factors. v2 is what shipped, and it is unchanged.)
+- **HARD vs SOFT split.** HARD: gender/identity, belief, commute/location,
+  budget, smoking — five fields, each checked in both directions. SOFT /
+  conflated: the six lifestyle scalars + MBTI. (Owner's call. An earlier v1
+  *forbade* MBTI from scoring; v2 adds it as one of seven equal-weight factors.
+  v2 is what shipped, and it is unchanged. Flat size was a gate in v2 and was
+  removed on 14 Oct — it now warns.)
 - **Campus auto-anchors target areas.** The institution sets the commute anchor
   from a `district` field, so *"is this area right for me?"* is computed, not
   entered by hand.
@@ -107,10 +118,12 @@ percentage.
   sign-up wall that kills walk-up demos — but it means nothing server-side
   attests that the address belongs to the answerer.
 - **Composite questions instead of a long quiz.** The owner set a 12-question
-  boundary; the shipped quiz is **14**. Keeping all nine eligibility filters (the
-  product's differentiator) plus the bonding question leaves two slots for the
-  soft block, so one option now writes three soft factors or two type axes at
-  once. The matcher's input is unchanged — verified, not assumed: 6/6 soft
+  boundary; the shipped quiz is **20** — compressed to 14 for v3, then re-expanded
+  by the owner's own review passes, which added the household, study-year and
+  major questions and reframed room size as flat size. Five of the twenty are hard
+  gates (the product's differentiator); the rest are soft, bonding, or
+  display-only. Composite options still write three soft factors or two type axes
+  at once, so the matcher's input is unchanged — verified, not assumed: 6/6 soft
   factors, 4/4 type axes, 16/16 reachable types, 16/16 lifestyle vectors. The
   two extra questions are recorded as an open question, not rounded away.
 - **Real-time AI is OFF.** No model is called anywhere. Every AI-shaped feature
@@ -186,16 +199,16 @@ percentage.
   types without checking.)
 - `npm run build` → green (69 modules, ~321 KB JS / ~101 KB gzip + ~65 KB CSS).
   Shippable.
-- `vault/checks/matching_ts_check.ts` → **8/8** against the
+- [`vault/checks/matching_ts_check.ts`](vault/checks/matching_ts_check.ts) → **8/8** against the
   `CP.calculate_match.v2` oracle. Re-run after the quiz trim specifically to
   prove the composite questions did not change the matcher's input.
 - End-to-end demo pipeline (quiz → profile → hard gate → score → hooks),
   run through a bundled script: the profile still carries **all six soft
   factors, a full four-letter MBTI, and every `looking_for` constraint**;
   the gate still hides on commute and smoking; scores are real.
-- Quiz shape verified mechanically rather than by eye: 14 questions
-  (2 lifestyle + 2 thinking + 1 bonding + 9 eligibility), 3 soft factors per
-  composite option, 2 type axes per composite option.
+- Quiz shape verified mechanically rather than by eye: 20 questions
+  (2 lifestyle + 2 thinking + 3 bonding + 2 display-only + 11 constraint),
+  3 soft factors per composite option, 2 type axes per composite option.
 - IP/CP vault: `ip_tool.py validate` **0 hard / 0 soft** on
   `IP.rentmate.v3`; `cp_tool.py validate` **0 hard** / 3 soft (the declared,
   accepted `CP_EFFECTS_ALL_EMPTY`); `ip_tool.py link` clean with 3 orphans
@@ -241,14 +254,14 @@ the user can watch working, in-app chat with report and block, and no agency fee
 
 1. Is the **icebreaker-hook UX** actually a defensible differentiator, or does it
    just dress up a grid?
-2. Are the **seven hard filters** sensible — especially **belief as a hard
+2. Are the **five hard filters** sensible — especially **belief as a hard
    filter** (ethics / privacy implications)?
 3. Does the **honesty ledger** hold up? Anything we are implicitly presenting as
    real that isn't?
 4. Is **"no model, labelled demo stubs"** the right call for this hackathon, or
    does it under-sell the submission?
 5. Any **gap between the validated contract (CP)** and what the UI actually does?
-6. **Runnability:** can a fresh session stand the project up from `SETUP.md`?
+6. **Runnability:** can a fresh session stand the project up from [`SETUP.md`](backend/supabase/SETUP.md)?
 7. Is the domain-only, client-side email gate a fatal weakness for this
    hackathon, or acceptable given the "explain why at the hackathon" stance?
 
@@ -258,18 +271,18 @@ the user can watch working, in-app chat with report and block, and no agency fee
 
 | Concern | File |
 | --- | --- |
-| Scoring contract | `vault/cps/CP.calculate_match.v2.md`, `vault/ips/IP.rentmate.v3.md` |
-| Score + hard gate | `Figma/src/lib/matching.ts` |
-| Hook engine | `Figma/src/lib/hooks.ts` |
-| Institution allowlist | `Figma/src/lib/institutions.ts` |
-| Quiz / profile builder | `Figma/src/lib/quiz.ts` |
-| Chat + moderation data layer | `Figma/src/lib/api.ts` |
-| Labelled demo content | `Figma/src/lib/areaGuides.ts`, `Figma/src/lib/safetyNotes.ts` |
-| Demo data + curated cast | `Figma/src/lib/demoData.ts` |
-| DB schema (auth-free) | `backend/supabase/migrations/20261013233000_roommate_matching.sql` |
-| Setup guide | `backend/supabase/SETUP.md` |
-| Oracle test | `vault/checks/matching_ts_check.ts` |
+| Scoring contract | [`vault/cps/CP.calculate_match.v2.md`](vault/cps/CP.calculate_match.v2.md), [`vault/ips/IP.rentmate.v3.md`](vault/ips/IP.rentmate.v3.md) |
+| Score + hard gate | [`Figma/src/lib/matching.ts`](Figma/src/lib/matching.ts) |
+| Hook engine | [`Figma/src/lib/hooks.ts`](Figma/src/lib/hooks.ts) |
+| Institution allowlist | [`Figma/src/lib/institutions.ts`](Figma/src/lib/institutions.ts) |
+| Quiz / profile builder | [`Figma/src/lib/quiz.ts`](Figma/src/lib/quiz.ts) |
+| Chat + moderation data layer | [`Figma/src/lib/api.ts`](Figma/src/lib/api.ts) |
+| Labelled demo content | [`Figma/src/lib/areaGuides.ts`](Figma/src/lib/areaGuides.ts), [`Figma/src/lib/safetyNotes.ts`](Figma/src/lib/safetyNotes.ts) |
+| Demo data + curated cast | [`Figma/src/lib/demoData.ts`](Figma/src/lib/demoData.ts) |
+| DB schema (auth-free) | [`backend/supabase/migrations/20261013233000_roommate_matching.sql`](backend/supabase/migrations/20261013233000_roommate_matching.sql) |
+| Setup guide | [`backend/supabase/SETUP.md`](backend/supabase/SETUP.md) |
+| Oracle test | [`vault/checks/matching_ts_check.ts`](vault/checks/matching_ts_check.ts) |
 
 **Run it:** `cd Figma && npm install && npm run dev` (local demo, no backend) or
-follow `SETUP.md` for the Supabase path — including how to see real two-browser
+follow [`SETUP.md`](backend/supabase/SETUP.md) for the Supabase path — including how to see real two-browser
 chat.

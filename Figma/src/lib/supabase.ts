@@ -23,12 +23,34 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-export const isSupabaseConfigured = Boolean(url && anonKey);
-
-export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(url as string, anonKey as string, {
+/**
+ * The client, or null when the project is not configured OR could not be built.
+ *
+ * The try/catch is not decoration. `createClient` throws on a key it does not
+ * recognise, and this module is imported at the top of the app — so one bad
+ * character in `.env.local` would take the whole demo down with a blank screen
+ * instead of quietly falling back to the in-browser path. That is a real risk
+ * now that the backend is actually switched on (it was never switched on before
+ * 14 Oct — see the note in `.env.local`).
+ */
+function buildClient(): SupabaseClient | null {
+  if (!url || !anonKey) return null;
+  try {
+    return createClient(url, anonKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-    })
-  : null;
+    });
+  } catch (error) {
+    console.error(
+      "[rentmate] Supabase is configured but the client could not be created — " +
+        "running in local mode. Check VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.",
+      error,
+    );
+    return null;
+  }
+}
 
-export const backendMode: "supabase" | "local" = isSupabaseConfigured ? "supabase" : "local";
+export const supabase: SupabaseClient | null = buildClient();
+
+export const isSupabaseConfigured = supabase !== null;
+
+export const backendMode: "supabase" | "local" = supabase ? "supabase" : "local";

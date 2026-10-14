@@ -14,6 +14,68 @@ walks through that.
 > **row level security is disabled**. The old `student_verifications`,
 > `quiz_answers` and `match_results` tables are gone. If you applied the previous
 > version of this migration, run `supabase db reset` (dev) to re-apply cleanly.
+>
+> **Later the same day**, a fourth migration (`20261014150000_rentmate_homes.sql`)
+> added the Homes half: the listing pool moved into the database, and your saved
+> homes / notes / viewing agreements moved out of browser storage and onto the
+> server. It is **additive** — nothing above it changes.
+>
+> **Later still**, a fifth migration (`20261014173000_profile_display_fields.sql`)
+> added `study_year` and `major` to `roommate_profiles` — display only, never
+> scored and never a gate. Also additive and idempotent.
+
+---
+
+## ⚠️ Read this if you are pointing at an EXISTING project
+
+The linked project is `ghvonvhpcmozpsfzuexo` (**rentMate**). On 2026-10-14 it was
+found to be carrying an **older, auth-based schema**, and the migrations in this
+folder will **not** repair it by themselves. What was measured, with the anon key:
+
+| Table | On the live project | What the app needs |
+| --- | --- | --- |
+| `roommate_profiles` | exists, **keyed on `user_id`**, columns `display_name`, `budget_min`, `budget_max`, `updated_at` | **keyed on `email`**, with `mbti_type`, `about_me`, `looking_for`, `target_areas`, … |
+| `messages` | exists with `sender_id` | `sender_email` + `body` |
+| `reports` | exists with `reporter_id` | `reporter_email` / `reported_email` |
+| `blocks` | **missing** | required |
+| `demo_listings`, `saved_listings`, `conversation_listings`, `viewings` | **missing** | required |
+
+**Why re-running the migrations does not fix it.** Every `create table` in
+`20261013233000_roommate_matching.sql` is `create table if not exists`. Against a
+database that already has a table *of the same name but a different shape*, that
+statement is a **silent no-op** — no error, no warning, and the old
+`user_id`-keyed table survives. You then get the most confusing failure mode
+available: the table exists, the app appears connected, and every write fails on
+a column that isn't there.
+
+**The fix — one of these, in order of preference:**
+
+1. **Start clean (best for a demo).** Dashboard → Settings → General → *Reset
+   database*, or `supabase db reset` against a linked dev project. Then run all
+   five migrations in order. Nothing on that project is worth keeping — it is
+   demo data.
+2. **Repair in place (keeps nothing, but is explicit).** Drop only the three
+   colliding tables and re-run the migrations:
+   ```sql
+   drop table if exists public.messages cascade;
+   drop table if exists public.reports  cascade;
+   drop table if exists public.roommate_profiles cascade;
+   ```
+   This is **destructive** — it deletes those tables' contents. It is the honest
+   option when you want to be certain the shape matches, rather than trusting a
+   no-op.
+
+Either way, **verify** rather than assume. `backend/scripts/check-live-schema.mjs`
+reads the live project with the anon key and prints exactly the table above for
+your project:
+
+```bash
+node backend/scripts/check-live-schema.mjs
+```
+
+Until it prints all-green, the app runs in local mode by design: `saveProfile`
+returns `"device"`, and the account menu shows *"Saved on this device — the
+server copy failed"* instead of silently pretending the write worked.
 
 ---
 
@@ -44,23 +106,34 @@ walks through that.
 
 ## 2. Run the database migrations
 
-The schema is three SQL files and they **must** run in order — the roommate
+The schema is **five** SQL files and they **must** run in order — every later
 migration reuses a helper (`public.set_updated_at()`) that the init migration
 creates.
 
 **Easiest path — SQL editor (no CLI needed):**
 1. Dashboard → **SQL Editor** → **New query**.
-2. Open `backend/supabase/migrations/20260313120000_init_hk_rental_platform.sql`,
+2. Open [`backend/supabase/migrations/20260313120000_init_hk_rental_platform.sql`](migrations/20260313120000_init_hk_rental_platform.sql),
    paste it, **Run**.
-3. New query → `backend/supabase/migrations/20260313120001_seed_amenities.sql`,
+3. New query → [`backend/supabase/migrations/20260313120001_seed_amenities.sql`](migrations/20260313120001_seed_amenities.sql),
    paste, **Run**.
-4. New query → `backend/supabase/migrations/20261013233000_roommate_matching.sql`,
-   paste, **Run**.
+4. New query → [`backend/supabase/migrations/20261013233000_roommate_matching.sql`](migrations/20261013233000_roommate_matching.sql),
+   paste, **Run**. *(If this project already has an old `roommate_profiles`,
+   read the "EXISTING project" section above first — this file will no-op.)*
+5. New query → [`backend/supabase/migrations/20261014150000_rentmate_homes.sql`](migrations/20261014150000_rentmate_homes.sql),
+   paste, **Run**. This one seeds 240 listings, so it takes a moment.
+6. New query → [`backend/supabase/migrations/20261014173000_profile_display_fields.sql`](migrations/20261014173000_profile_display_fields.sql),
+   paste, **Run**. Additive, idempotent, no data touched.
 
 **CLI path** (run from `backend/supabase`):
 ```bash
 supabase link --project-ref <your-project-ref>
 supabase db push
+```
+
+Then confirm it actually landed — the migration runner's silence is not proof:
+
+```bash
+node ../scripts/check-live-schema.mjs
 ```
 
 What these create (the roommate bits you care about):
@@ -71,7 +144,23 @@ What these create (the roommate bits you care about):
 | `messages` | Real in-app chat. `conversation_id` is `[a,b].sort().join("::")`; `id` is **client-generated** so an optimistic append and the Realtime echo dedupe on the same id. |
 | `reports` | Moderation: a user reports another from a conversation. |
 | `blocks` | "End a connection". When A blocks B, **both** see the conversation gone. |
-| `calculate_match_score(a, b)` | The deterministic score from `CP.calculate_match.v2`, in SQL — a **reference mirror**, *not* invoked at runtime. The app scores locally in `Figma/src/lib/matching.ts`. |
+| `calculate_match_score(a, b)` | The deterministic score from `CP.calculate_match.v2`, in SQL — a **reference mirror**, *not* invoked at runtime. The app scores locally in [`Figma/src/lib/matching.ts`](../../Figma/src/lib/matching.ts). |
+
+What the fourth migration (`20261014150000_rentmate_homes.sql`) creates — the
+Homes half:
+
+| Object | What it is |
+| --- | --- |
+| `demo_listings` | The listing pool, **240 rows, synthetic**. Before this the pool was generated in the browser ([`Figma/src/lib/listings.ts`](../../Figma/src/lib/listings.ts), 72 rows) and could not be edited without a redeploy. `id` is a plain integer so a generated row and a served row are interchangeable. |
+| `saved_listings` | Your shortlist, keyed `(email, listing_id)`, carrying **your** note and **your** status. Not per-conversation. |
+| `conversation_listings` | A home you sent into a conversation. This is what the Messages tab filters on, and what makes "did we ever look at that place?" answerable. |
+| `viewings` | The viewing you agreed to. `when_text` is free text on purpose — the two of you agree a time in the chat; RentMate only remembers and reminds. `checklist` stores *which* safety notes were ticked, not a boolean "read it". |
+
+> **The seed is a mirror, not a copy.** The formulas that generate `demo_listings`
+> are the same ones in `Figma/src/lib/listings.ts`, so row #1 in Postgres and row
+> #1 in the browser describe the same flat — the only intended difference is
+> quantity (240 vs 72). **If you change one, change the other**, or the offline
+> fallback and the connected pool will quietly disagree about the same flat.
 
 ### Realtime must be on for chat
 
@@ -83,19 +172,33 @@ yourself or the chat will only ever show history:
 alter publication supabase_realtime add table public.messages;
 ```
 
+`conversation_listings` and `viewings` are in the publication too, so a home one
+person sends, and a viewing one person confirms, show up for the other without a
+refresh.
+
 ### Row Level Security is OFF — and that is deliberate
 
 ```sql
-alter table public.roommate_profiles disable row level security;
-alter table public.messages        disable row level security;
-alter table public.reports         disable row level security;
-alter table public.blocks          disable row level security;
+alter table public.roommate_profiles    disable row level security;
+alter table public.messages             disable row level security;
+alter table public.reports              disable row level security;
+alter table public.blocks               disable row level security;
+alter table public.demo_listings        disable row level security;
+alter table public.saved_listings       disable row level security;
+alter table public.conversation_listings disable row level security;
+alter table public.viewings             disable row level security;
 ```
 
 With no Supabase Auth there is no `auth.users` and therefore no `auth.uid()` to
 key a policy on — an *enabled* policy would block **every** row and the app
 would look broken. **The consequence is that anyone holding the anon key can read
-and write every row in these four tables.**
+and write every row in these eight tables.**
+
+With `saved_listings` in the list, the consequence is worth saying in full:
+**anyone holding the anon key can read and write anyone's shortlist, notes and
+viewing agreements** — not just the synthetic listings. Still fine for a demo,
+because everything in it is demo data. Not fine the moment a real student saves
+a real flat.
 
 That is acceptable for a demo over synthetic data and **not** acceptable for real
 students. Before this schema is pointed at real people you need a real auth
@@ -107,7 +210,7 @@ policies must be keyed on **that** claim — not retrofitted onto `auth.uid()`.
 ## 3. No Edge Function is needed
 
 The app does **not** call `backend/supabase/functions/compatibility`. Scoring and
-the narrative are computed client-side (`lib/matching.ts`, `lib/hooks.ts`), so
+the narrative are computed client-side ([`lib/matching.ts`](../../Figma/src/lib/matching.ts), [`lib/hooks.ts`](../../Figma/src/lib/hooks.ts)), so
 the function is a standalone reference artifact, not part of the running product.
 You can skip this step entirely.
 
@@ -124,7 +227,7 @@ The app reads two public variables.
    ```bash
    cp .env.example .env.local
    ```
-   Then edit `Figma/.env.local`:
+   Then edit [`Figma/.env.local`](../../Figma/.env.local):
    ```
    VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
    VITE_SUPABASE_ANON_KEY=<your-anon-key>
@@ -142,7 +245,7 @@ RentMate does **not** send a verification email, and **nothing about
 verification is stored anywhere** — the table that used to hold a boolean
 attestation was dropped. "Verification" means the address's domain matches the
 12-institution / 41-domain allowlist (`validateInstitutionEmail` in
-`lib/institutions.ts`), checked **client-side**. That is the whole gate.
+[`lib/institutions.ts`](../../Figma/src/lib/institutions.ts)), checked **client-side**. That is the whole gate.
 
 Consequences, stated plainly:
 
@@ -162,7 +265,7 @@ Consequences, stated plainly:
 For this hackathon **no model is called anywhere in the shipped app**. The
 match narrative, the hook deck, the neighbourhood guide, the safety notes and
 the viewing scheduler are all pre-written content, and the UI badges each one
-"AI · demo" (see `GenBadge` in `App.tsx`).
+"AI · demo" (see `GenBadge` in [`App.tsx`](../../Figma/src/App.tsx)).
 
 Reasons:
 
@@ -228,9 +331,14 @@ the UI says so rather than implying an action it cannot take. `demo@` does
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| App says `local` mode but you set env vars | `.env.local` not picked up / wrong names | Confirm `VITE_SUPABASE_URL` & `VITE_SUPABASE_ANON_KEY` exactly; restart dev |
+| App says `local` mode but you set env vars | `.env.local` not picked up / wrong names | Confirm `VITE_SUPABASE_URL` & `VITE_SUPABASE_ANON_KEY` exactly; restart dev. **`NEXT_PUBLIC_*` is silently ignored by Vite** — this was the actual cause once already |
+| Sign out / sign in loses everything | The write never reached Postgres | Check the account menu's sync note. `device` = the server write failed. Then run `node backend/scripts/check-live-schema.mjs` |
+| Table exists but writes fail with "column … does not exist" | An **older table of the same name** survived `create table if not exists` | The migrations no-op'd. See the "EXISTING project" section — reset or drop-and-recreate |
+| `demo_listings` / `saved_listings` 404 (`PGRST205`) | Migration 4 never ran on this project | Run migration 4 in step 2 |
 | Chat shows history but never live updates | `messages` is not in the `supabase_realtime` publication | Run the `alter publication` statement in step 2 |
-| "new row violates row-level security policy" | RLS is **enabled** on a table | The migration disables it on all four tables; enable nothing by hand with the auth-free model |
-| My own messages appear twice | A stale optimistic append | By design the client generates the id, so the echo dedupes — update to the current `api.ts` |
+| "new row violates row-level security policy" | RLS is **enabled** on a table | The migrations disable it on all eight tables; enable nothing by hand with the auth-free model |
+| Homes tab still shows 72 listings after connecting | `demo_listings` missing or empty | Run migration 5 in step 2. The app silently falls back to the built-in pool rather than showing an empty tab |
+| Saved homes don't follow me to another browser | `saved_listings` write failed | localStorage is written first and always; the Postgres mirror is best-effort. Check the table exists and the browser console for the failed request |
+| My own messages appear twice | A stale optimistic append | By design the client generates the id, so the echo dedupes — update to the current [`api.ts`](../../Figma/src/lib/api.ts) |
 | Curated account won't send email | Expected — no account sends email | Works in both local and Supabase modes; domain-only gate |
 | Profile won't save | Table missing or wrong key | The migration keys `roommate_profiles` on `email`, not `user_id` |

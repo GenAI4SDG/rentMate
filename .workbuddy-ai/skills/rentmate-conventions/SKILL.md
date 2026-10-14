@@ -49,7 +49,7 @@ If a request falls outside this list, say so and ask whether to change the scope
 - **Vite + React + TypeScript** (not Next.js — explicit routing is easier for this team)
 - **Supabase** for Auth, Postgres, and **pgvector** for RAG
 - **GenAI calls go through Supabase Edge Functions (Deno)** so API keys never reach the client
-- **No deployment needed** — organisers confirmed localhost is accepted. Do not spend time on Vercel/Netlify.
+- **Hosting: a public URL is REQUIRED.** Organisers accept a localhost build, but the submission deck must carry a **clickable link** — a judge cannot open `localhost`. Deploy the static build; do not build a server or an API layer. Full instructions: [`docs/HOSTING.md`](../../../docs/HOSTING.md).
 
 **Repo status:** TypeScript migration is **done** (24 Sep) and `npm run typecheck` **passes** (25 Sep). Write `.tsx`, not `.jsx`.
 

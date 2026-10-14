@@ -24,7 +24,7 @@
 #
 # These are stated as intent, not hidden. The G-8 human boundary was NOT
 # exercised; the owner waived the signature and told the agent to auto-approve.
-# That gap is declared in `vault/README.md`, never papered over.
+# That gap is declared in [`vault/README.md`](../README.md), never papered over.
 # ============================================================================
 ip_version: 1
 id: IP.rentmate.v3
@@ -34,12 +34,12 @@ edit_tag:
   author: "agent"
   when: "2026-10-14"
   version: 3
-  change: "rewritten against the shipped code after the owner's 2026-10-14 decisions: email-as-identity with NO Supabase Auth and NO stored verification (RLS disabled); GenAI downgraded from a live model to hardcoded, explicitly-labelled demo content; new real in-app chat with report/block moderation and no contact-detail exchange; viewing scheduler and neighbourhood guide hardcoded; 3D walkthrough reduced to a labelled cosmetic stub; verification table dropped; quiz at 14 composite questions covering every eligibility filter and every scored factor"
+  change: "rewritten against the shipped code after the owner's 2026-10-14 decisions: email-as-identity with NO Supabase Auth and NO stored verification (RLS disabled); GenAI downgraded from a live model to hardcoded, explicitly-labelled demo content; new real in-app chat with report/block moderation and no contact-detail exchange; viewing scheduler and neighbourhood guide hardcoded; 3D walkthrough reduced to a labelled cosmetic stub; verification table dropped; quiz compressed to 14 composite questions covering every eligibility filter and every scored factor (re-expanded to 20 by the owner's 14 Oct review passes)"
 
 problem_statement:
   problem: "Non-local students arriving in Hong Kong cannot settle housing quickly: an agency fee worth a month's rent, listings they cannot trust, and roommates they cannot assess before committing. The repository itself disagreed about what the product is — a landlord/tenant marketplace, a 'verification is the product' trust utility, and a roommate-matcher all coexisted — so the build drifted from the statement the team actually agreed."
-  intended_behavior: "A student enters a university email, which is checked client-side against an institution domain and is the account key for everything that follows. They answer a 14-question questionnaire whose seven eligibility answers exclude people outright and whose soft answers feed a deterministic compatibility score. They then match on a hook deck, talk inside the app (never by exchanging personal contact details), can report or end a connection, and can propose a viewing time. Neighbourhood and safety information is pre-written and cited, and every feature that would be a model in production is labelled as a demo stub."
-  high_impact_components: "The seven hard eligibility filters — gender, belief, target area, commute, budget, room size, smoking — all of which gate candidates before scoring and none of which may enter the score; the deterministic compatibility score over the six shared soft lifestyle factors plus MBTI, computed client-side; the in-app chat as the only channel, so contact details are never shared; the moderation pair (report, block) as the safety mechanism; and the GenAI boundary — which in this build is a LABEL, not a model."
+  intended_behavior: "A student enters a university email, which is checked client-side against an institution domain and is the account key for everything that follows. They answer a 20-question questionnaire whose five eligibility constraints exclude people outright — in both directions — and whose soft answers feed a deterministic compatibility score. They then match on a hook deck, talk inside the app (never by exchanging personal contact details), can report or end a connection, and can propose a viewing time. Neighbourhood and safety information is pre-written and cited, and every feature that would be a model in production is labelled as a demo stub."
+  high_impact_components: "The five hard eligibility constraints — gender, belief, smoking, commute/location, budget — each applied in both directions, all of which gate candidates before scoring and none of which may enter the score (flat size was removed as a gate on 14 Oct and warns instead); the deterministic compatibility score over the six shared soft lifestyle factors plus MBTI, computed client-side; the in-app chat as the only channel, so contact details are never shared; the moderation pair (report, block) as the safety mechanism; and the GenAI boundary — which in this build is a LABEL, not a model."
 
 nodes:
   # --- root -----------------------------------------------------------------
@@ -97,7 +97,7 @@ approval:
 
 > "**RentMate** — Roommate matching and affordable housing for students in Hong Kong
 > — helping non-local students settle in quickly, with compatible roommates and no
-> agency fee worth a month's rent." — `README.md`
+> agency fee worth a month's rent." — [`README.md`](../../README.md)
 
 > "**The four focuses, in order:** compatibility · affordability · transparency ·
 > safety (trust and privacy). **Listing verification is ruled out.**" — interim report
@@ -124,7 +124,7 @@ promised, and they are recorded here rather than quietly absorbed:**
 | The GenAI narrative | "GPT-4o-mini writes the narrative only — the one GenAI component the report names by model, never cut" | **no model is called anywhere.** Every AI-shaped feature is pre-written content carrying an "AI · demo" badge |
 | Chat | not mentioned | **real, persisted in-app chat** with report and block |
 | Contact details | privacy by design | **never exchanged** — no phone, no socials, chat only, and ending a connection removes it for both sides |
-| Quiz length | 12 questions | **14 questions**, all seven eligibility filters kept, soft block compressed |
+| Quiz length | 12 questions | **20 questions** — the v3 compression to 14 was undone by the owner's 14 Oct review passes; see U9 |
 | 3D walkthrough | "3D construction of the room" out of scope | **a labelled cosmetic stub** — a flat stock-photo drag panorama marked "Illustrative mock · not a real 3D scan" |
 | Neighbourhood guide | a cited guide | pre-written and cited for 9 districts; the retrieval is a stub |
 | Listing verification | ruled out | still ruled out, and now the *table* is gone too |
@@ -143,25 +143,33 @@ reliability, and it is stated rather than dressed up.
 **In scope — the demo path:**
 
 - **F1 · University-email access gate.** A student types a university email. It
-  is checked **client-side** against an institution allowlist (`lib/institutions.ts`)
+  is checked **client-side** against an institution allowlist ([`lib/institutions.ts`](../../Figma/src/lib/institutions.ts))
   and becomes the account key for the profile, the matches and the chat. There
   is no sign-up, no password, no OTP, and no server-side check. **Eligibility,
   not verification** — and unlike v2, nothing is stored to attest it either.
-- **F2 · Lifestyle questionnaire (14 questions).** Four soft questions
-  (`lifestyle` ×2, `thinking` ×2), one bonding question, and **nine eligibility
-  questions**. The soft block is *composite*: one option writes concrete 0..1
-  values for three factors, or fixes two type axes at once — so the matcher's
-  input is unchanged (all six soft factors, a full four-letter type, all sixteen
-  types reachable) while the questionnaire stays short. Verified, not assumed.
-- **F3 · Hard-constraint filter.** **Seven** eligibility answers gate candidates
-  before scoring: gender, belief, target area, commute limit, budget, room size,
-  smoking. These are predicates, never weights, and the app shows who they hid
-  and why.
+- **F2 · Lifestyle questionnaire (20 questions).** Four soft questions
+  (`lifestyle` ×2, `thinking` ×2), a bonding block (`interests`, `cook_at_home`,
+  `about_you_line`), two display-only questions (`study_year`, `major`) and the
+  eligibility questions below. The soft block is *composite*: one option writes
+  concrete 0..1 values for three factors, or fixes two type axes at once — so
+  the matcher's input is unchanged (all six soft factors, a full four-letter
+  type, all sixteen types reachable). `study_year` and `major` are never scored
+  and never gate; they exist so a profile can say who someone is.
+- **F3 · Hard-constraint filter.** **Five** constraint fields gate candidates
+  before scoring: gender, belief, smoking, commute/location and budget. Each is
+  applied in **both directions** — your requirement can hide them, and theirs
+  can hide you — and the app shows which, per person, rather than hiding anyone
+  silently. These are predicates, never weights.
+
+  **Flat size is not one of them.** It was a gate in v2 and was overruled on
+  14 Oct ("why is this a blocking criteria?"); a conflicting flat-size
+  preference now raises a warning at the point a home is suggested instead of
+  hiding a person. See `flatSizeWarning` in `Figma/src/lib/matching.ts`.
 - **F4 · Deterministic compatibility score.** A weighted similarity over the
   soft factors the two profiles share, renormalised over shared factors only;
-  MBTI is one scored factor. Computed **client-side** in `lib/matching.ts`.
+  MBTI is one scored factor. Computed **client-side** in [`lib/matching.ts`](../../Figma/src/lib/matching.ts).
 - **F5 · Match narrative and hooks.** Pre-written, and derived deterministically
-  from the two profiles (`lib/hooks.ts`) — an icebreaker deck, not a model's
+  from the two profiles ([`lib/hooks.ts`](../../Figma/src/lib/hooks.ts)) — an icebreaker deck, not a model's
   prose. **This is the feature v2 called GenAI; it is now a labelled demo.**
 - **F6 · Match results with price context.** Cost shown against the
   no-agency-fee promise.
@@ -195,12 +203,20 @@ a live model endpoint in the demo build · a real 3D capture of any room.
   affordance. A student can type any allowlisted address, including one that is
   not theirs, and there is nothing server-side to catch it.
 - **U9 — the 12-question boundary.** The owner set 12 as the demo length. The
-  build is **14**: keeping all seven eligibility filters (the product's
-  differentiator) plus the bonding question leaves two slots for the soft
-  block, and compression below that would drop scored factors. The two extra
-  questions are recorded here rather than silently absorbed.
-- **U6 — Figma vs the root app, and therefore hosting.** Still the team's open
-  question, unchanged from v2.
+  build is **20**. v3 compressed the questionnaire from 20 to **14** by letting
+  composite options answer several factors at once; the owner's own review
+  passes (14 Oct) then added six back — `roommate_count`, `must_haves`,
+  `cook_at_home`, `about_you_line`, `study_year` and `major` — and reframed
+  `room_size` as `flat_size` so a small flat warns instead of excluding. The
+  added questions are either unscored (study year, major, the bonding block) or
+  hard filters the owner asked for. That is **eight over** the boundary, which
+  is the honest number and is recorded here rather than rounded down.
+- **U6 — Figma vs the root app, and therefore hosting. RESOLVED 14 Oct 2026.**
+  The product is the **`Figma/`** app; the root Vite shell is a placeholder.
+  Hosting is **required**, not optional — the organisers accept a localhost
+  build, but the submission deck must carry a clickable link and a judge cannot
+  open `localhost`. The deploy is static (`Figma/dist/`), so there is no server
+  or API layer to build. See [`docs/HOSTING.md`](../../docs/HOSTING.md).
 - **The 66% / 68% figures.** The report's headline percentages are the same
   survey items earlier drafts recorded as *detractor counts* (27/41 and 28/41).
   Recorded as a caveat, never as a node.

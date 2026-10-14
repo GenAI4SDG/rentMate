@@ -11,24 +11,10 @@
             "id": "5003670905f0e787",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "ips/IP.rentmate.v2.md",
-                "mode": "source",
-                "source": false,
-                "backlinks": true,
-                "backlinkOpts": {
-                  "collapseAll": false,
-                  "extraContext": false,
-                  "sortOrder": "alphabetical",
-                  "showSearch": false,
-                  "searchQuery": "",
-                  "backlinkCollapsed": false,
-                  "unlinkedCollapsed": true
-                }
-              },
-              "icon": "lucide-file",
-              "title": "IP.rentmate.v2"
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -200,7 +186,7 @@
   },
   "active": "5003670905f0e787",
   "lastOpenFiles": [
-    "cps/CP.calculate_match.v2.md",
-    "ips/IP.rentmate.v2.md"
+    "ips/IP.rentmate.v2.md",
+    "cps/CP.calculate_match.v2.md"
   ]
 }

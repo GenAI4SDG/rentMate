@@ -23,8 +23,12 @@ export type LookingFor = {
   max_commute_minutes?: number | null;
   /** Upper bound on monthly rent the seeker will pay. */
   budget_max?: number | null;
-  /** Minimum acceptable room size in sq ft. */
-  room_size_min?: number | null;
+  /**
+   * Preferred minimum WHOLE-FLAT size in sq ft. A preference since 14 Oct —
+   * it is never used to hide anyone, only to warn when a suggested home is
+   * outside it. See `flatSizeWarning`.
+   */
+  flat_size_min?: number | null;
   smoking_rule?: "required_non_smoking" | "no_preference" | null;
 };
 
@@ -40,7 +44,26 @@ export type Profile = {
   target_areas?: string[] | null;
   budget_min?: number | null;
   budget_max?: number | null;
-  room_size?: number | null;
+  /** Whole-flat size this person is after, sq ft. A preference, never a gate. */
+  flat_size?: number | null;
+  /** Everyone moving in, including this person. Drives the household budget. */
+  household_size?: number | null;
+  /** Must-haves for the home. Sorts saved listings; never filters people. */
+  must_haves?: string[] | null;
+  /** How often they cook. Unscored — an icebreaker, not a contract input. */
+  cooks_at_home?: "every day" | "often" | "rarely" | "never" | null;
+  /** Their own one-line "about me". Free text, written in the quiz. */
+  tagline?: string | null;
+  /**
+   * Year of study and field of study, asked in the quiz.
+   *
+   * These were NOT fields until 14 Oct — the curated demo cast baked them into
+   * the `school` string ("CUHK · Year 2 · Sociology"), which meant the owner's
+   * own profile could show a university and nothing else. They are display-only:
+   * neither is scored and neither gates anyone.
+   */
+  study_year?: string | null;
+  major?: string | null;
   /** Free-form shared vocabulary; drives the icebreaker hooks, never the score. */
   interests?: string[] | null;
   /** Soft scalar factors, normalised 0..1. `smoking_status` is 1 = non-smoking. */
@@ -188,13 +211,7 @@ export function areaFit(
 
 export type GateFinding = {
   /** Which constraint fired. */
-  field:
-    | "gender"
-    | "belief"
-    | "smoking"
-    | "location"
-    | "budget"
-    | "room_size";
+  field: "gender" | "belief" | "smoking" | "location" | "budget";
   /** Whose requirement fired: the seeker's or the other person's. */
   side: "you" | "them";
   /** Human sentence for the "we hid these people because…" list. */
@@ -270,15 +287,36 @@ function budgetReason(seeker: Profile, other: Profile, side: "you" | "them"): st
     : `Your budget is below their $${theirFloor.toLocaleString("en-US")} floor`;
 }
 
-function roomSizeReason(seeker: Profile, other: Profile, side: "you" | "them"): string | null {
-  const min = (seeker.looking_for ?? {}).room_size_min;
+/**
+ * Flat size used to be a hard gate — it hid people outright for wanting a
+ * smaller or larger flat, which the owner overruled on 14 Oct ("why is this a
+ * blocking criteria?"). It is a PREFERENCE now: this returns a warning string
+ * when someone's flat-size preference conflicts, and `filterReasons` never
+ * sees it. The intended use is a heads-up at the moment a home is suggested —
+ * "this is within their range, over yours" — not a reason to hide a person.
+ */
+export function flatSizeWarning(seeker: Profile, other: Profile): string | null {
+  const min = (seeker.looking_for ?? {}).flat_size_min;
   if (min === null || min === undefined) return null;
-  const theirs = other.room_size;
+  const theirs = other.flat_size;
   if (theirs === null || theirs === undefined) return null;
   if (theirs >= min) return null;
-  return side === "you"
-    ? `Their room is smaller than the ${min} sq ft you asked for`
-    : `Your room is smaller than the ${min} sq ft they asked for`;
+  return `They're after something under the ${min} sq ft you asked for — you may not want to take it.`;
+}
+
+/**
+ * The same warning, but for a HOME rather than a person — used when someone
+ * proposes a listing. `sqft` is the whole flat, matching the quiz question.
+ */
+export function flatSizeWarningForHome(
+  seeker: Profile,
+  sqft: number | null | undefined,
+): string | null {
+  const min = (seeker.looking_for ?? {}).flat_size_min;
+  if (min === null || min === undefined) return null;
+  if (sqft === null || sqft === undefined) return null;
+  if (sqft >= min) return null;
+  return `Heads up: this one is ${sqft} sq ft, under the ${min} sq ft you said you'd want.`;
 }
 
 /** CP.filter_eligible_matches.v1 — every hard constraint, both directions. */
@@ -289,7 +327,6 @@ export function filterReasons(seeker: Profile, other: Profile): GateFinding[] {
     ["smoking", smokingReason(seeker, other, "you"), smokingReason(other, seeker, "them")],
     ["location", locationReason(seeker, other, "you"), locationReason(other, seeker, "them")],
     ["budget", budgetReason(seeker, other, "you"), budgetReason(other, seeker, "them")],
-    ["room_size", roomSizeReason(seeker, other, "you"), roomSizeReason(other, seeker, "them")],
   ];
   const out: GateFinding[] = [];
   for (const [field, yours, theirs] of pairs) {

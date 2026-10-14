@@ -70,7 +70,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ISFJ",
       area: "Sha Tin",
       target_areas: ["Sha Tin", "Tai Wai"],
-      room_size: 90,
+      flat_size: 725,
       ...rent(6500, 8000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.33,
@@ -94,7 +94,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "INTJ",
       area: "Kowloon Tong",
       target_areas: ["Kowloon Tong", "Ho Man Tin"],
-      room_size: 100,
+      flat_size: 494,
       ...rent(7000, 9000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0, social_guest_preference: 0.33,
@@ -118,7 +118,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ENFP",
       area: "Kennedy Town",
       target_areas: ["Kennedy Town", "Sai Ying Pun"],
-      room_size: 110,
+      flat_size: 864,
       ...rent(8000, 10000),
       about_me: {
         sleep_schedule: 0.67, shared_space_habits: 0.67, social_guest_preference: 0.67,
@@ -142,7 +142,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ISTP",
       area: "Hung Hom",
       target_areas: ["Hung Hom", "Ho Man Tin"],
-      room_size: 80,
+      flat_size: 956,
       ...rent(6000, 8000),
       about_me: {
         sleep_schedule: 0, shared_space_habits: 0.33, social_guest_preference: 0.33,
@@ -166,7 +166,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ESTJ",
       area: "Kowloon Tong",
       target_areas: ["Kowloon Tong", "Sham Shui Po"],
-      room_size: 95,
+      flat_size: 910,
       ...rent(7000, 9000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.67,
@@ -190,7 +190,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "INFP",
       area: "Tseung Kwan O",
       target_areas: ["Tseung Kwan O", "North Point"],
-      room_size: 85,
+      flat_size: 540,
       ...rent(6500, 8500),
       about_me: {
         sleep_schedule: 0.67, shared_space_habits: 0.33, social_guest_preference: 0,
@@ -216,7 +216,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ESFP",
       area: "Tai Po",
       target_areas: ["Tai Po", "Fo Tan"],
-      room_size: 70,
+      flat_size: 586,
       ...rent(5500, 7000),
       about_me: {
         sleep_schedule: 1, shared_space_habits: 0.67, social_guest_preference: 1,
@@ -240,7 +240,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ISFP",
       area: "Tuen Mun",
       target_areas: ["Tuen Mun"],
-      room_size: 65,
+      flat_size: 401,
       ...rent(5000, 7000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.33,
@@ -264,7 +264,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "ENTP",
       area: "Sai Ying Pun",
       target_areas: ["Sai Ying Pun", "Kennedy Town"],
-      room_size: 120,
+      flat_size: 633,
       ...rent(8000, 10000),
       about_me: {
         sleep_schedule: 1, shared_space_habits: 0.67, social_guest_preference: 0.67,
@@ -288,7 +288,7 @@ export const CANDIDATES: Candidate[] = [
       mbti_type: "INFJ",
       area: "Tai Wai",
       target_areas: ["Tai Wai", "Sha Tin"],
-      room_size: 90,
+      flat_size: 725,
       ...rent(6000, 8000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.67,
@@ -332,7 +332,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "ISFJ",
       area: "Sha Tin",
       target_areas: ["Sha Tin", "Tai Wai"],
-      room_size: 90,
+      flat_size: 725,
       ...rent(6500, 8000),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.33,
@@ -368,7 +368,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "ENFP",
       area: "Tai Wai",
       target_areas: ["Tai Wai", "Sha Tin"],
-      room_size: 80,
+      flat_size: 956,
       ...rent(6000, 8000),
       about_me: {
         sleep_schedule: 0.67, shared_space_habits: 0.67, social_guest_preference: 0.67,
@@ -404,7 +404,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "ISTJ",
       area: "Ma On Shan",
       target_areas: ["Ma On Shan", "Sha Tin"],
-      room_size: 110,
+      flat_size: 864,
       ...rent(5500, 7000),
       about_me: {
         sleep_schedule: 0, shared_space_habits: 0, social_guest_preference: 0.33,
@@ -440,7 +440,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "ESFP",
       area: "Sha Tin",
       target_areas: ["Sha Tin", "Tai Wai"],
-      room_size: 95,
+      flat_size: 910,
       ...rent(7000, 9000),
       about_me: {
         sleep_schedule: 0.67, shared_space_habits: 0.67, social_guest_preference: 1,
@@ -476,7 +476,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "INTP",
       area: "Fo Tan",
       target_areas: ["Fo Tan", "Sha Tin"],
-      room_size: 100,
+      flat_size: 494,
       ...rent(6000, 7500),
       about_me: {
         sleep_schedule: 1, shared_space_habits: 0.67, social_guest_preference: 0.33,
@@ -512,7 +512,7 @@ export const CURATED_CAST: Candidate[] = [
       mbti_type: "INFJ",
       area: "Sha Tin",
       target_areas: ["Sha Tin", "Tai Wai"],
-      room_size: 85,
+      flat_size: 540,
       ...rent(6500, 8500),
       about_me: {
         sleep_schedule: 0.33, shared_space_habits: 0.33, social_guest_preference: 0.33,

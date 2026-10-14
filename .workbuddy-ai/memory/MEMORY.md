@@ -113,7 +113,7 @@ Repo is on `.tsx` with `tsconfig.json`, `typescript`, `@types/react`, `@types/re
 | # | Answer | Impact |
 |---|---|---|
 | 1 | **Any GenAI inclusion expected**; no tech/cloud blacklist | GenAI is a *scored requirement*, not garnish |
-| 2 | **localhost is fine** | No deploy work needed. Skip Vercel/Netlify |
+| 2 | **localhost is fine** for the build — but the **deck needs a clickable link**, so a public URL is required | Deploy the static `Figma/dist/`. See [`docs/HOSTING.md`](../../docs/HOSTING.md) |
 | 3 | **Live demo**, video recommended as backup; non-software projects need no demo | Record a video — insurance against a dead laptop |
 | 4 | **No API blacklist**; arranging access is good | Maps/transit + R&VD open data are fair game — start in Block 1 |
 | 5 | **Synthetic profiles fine** | No demo-data privacy blocker |
@@ -228,7 +228,7 @@ The team said the long decision lists were unusable — nobody wants to read ~70
 - Verification rail: **university email is sufficient** for safety and trust (report). All users must be a university student **to access the platform**. Student-card OCR via vision model is an addition, **unconfirmed by the report**. HKID verification and face scanning are out of scope. LLM (GPT-4o-mini) for the compatibility narrative.
 - Delivery: **responsive web app, not native mobile** (deck's scope decision). English-first UI, chatbot answers in any language.
 - Verification data stored as a **boolean attestation, never the source document** — PDPO exposure.
-- **No deploy needed** — organisers accept localhost. Skip Vercel/Netlify.
+- **Hosting: required for submission** — organisers accept localhost, but the deck must show a clickable link. Static deploy of `Figma/dist/`; no server process. See [`docs/HOSTING.md`](../../docs/HOSTING.md).
 
 ## Conventions
 

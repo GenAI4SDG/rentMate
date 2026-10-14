@@ -4,34 +4,45 @@
 //   SOFT  (scored, conflation is fine)      → sections "lifestyle" + "thinking"
 //   BONDING (neither scored nor gated)      → section "bonding"
 //   HARD  (gate before scoring, never scored) → section "nonneg"
+//   DISPLAY (shown on the profile, never scored, never gated) → section "you"
 //
 // The hard block exists because the interesting claim is not "we ask 20
-// questions" — everyone asks questions. It is that seven of the answers *exclude
-// people outright*, and the app shows you who it hid and why.
+// questions" — everyone asks questions. It is that several of the answers
+// *exclude people outright*, and the app shows you who it hid and why.
 //
-// Question count: the owner set a short demo questionnaire. All seven
-// eligibility filters are kept (they are the product's differentiator), and the
-// soft block is compressed into composite questions instead — one tap answers
-// several soft factors, or fixes several type axes. Nothing is dropped from the
-// matcher's input: `answersToProfile` still produces every one of the six soft
-// factors and a full four-letter type. See `values` / `letters` on QuizOption.
+// Question count: the owner set a short demo questionnaire. All the eligibility
+// filters are kept (they are the product's differentiator), and the soft block
+// is compressed into composite questions instead — one tap answers several soft
+// factors, or fixes several type axes. Nothing is dropped from the matcher's
+// input: `answersToProfile` still produces every one of the six soft factors
+// and a full four-letter type. See `values` / `letters` on QuizOption.
 //
 // Every hard question has an explicit "no preference" option. Skipping a filter
 // is a legitimate choice, and an unanswered filter must never silently reject.
 //
 // The old Figma Q7 ("Same gender as me") used to conflate identity with
 // preference — those are split apart on purpose (gender_identity vs
-// gender_preference).
+// gender_preference), and since 14 Oct the two halves sit on the SAME page,
+// because they are the same topic. Same for the belief pair.
+//
+// NOT HARD ANYMORE: flat size. It used to block people outright. It is now a
+// preference — you get told when a suggested home is outside your range, and
+// nobody is hidden because of it. See `flatSizeWarning` in lib/matching.ts.
 
 import { INTEREST_VOCAB } from "./hooks"
+import { MUST_HAVE_OPTIONS } from "./listings"
 import { TARGET_AREA_OPTIONS, type GenderIdentity, type Profile } from "./matching"
 
-export type QuizSection = "lifestyle" | "thinking" | "bonding" | "nonneg"
+export type QuizSection = "you" | "lifestyle" | "thinking" | "bonding" | "nonneg"
 
 export const SECTIONS: Record<QuizSection, { label: string; blurb: string }> = {
+  you: {
+    label: "About you",
+    blurb: "Two basics, so people know who they're talking to. Never scored.",
+  },
   lifestyle: {
     label: "How you live",
-    blurb: "The everyday stuff. These feed the score.",
+    blurb: "The everyday stuff. These shape who you get on with.",
   },
   thinking: {
     label: "How you think",
@@ -39,11 +50,11 @@ export const SECTIONS: Record<QuizSection, { label: string; blurb: string }> = {
   },
   bonding: {
     label: "What you'd bond over",
-    blurb: "Purely for the icebreaker. Never scored, never a filter.",
+    blurb: "Purely for the icebreaker. Never a filter.",
   },
   nonneg: {
     label: "What's non-negotiable",
-    blurb: "These don't affect your score — they decide who you see at all.",
+    blurb: "These decide who you see at all.",
   },
 }
 
@@ -68,19 +79,25 @@ export type QuizOption = {
   belief?: string
   /** True when the answerer does not want belief to be a filter. */
   anyBelief?: boolean
-  /** Interest / area multi-selects. */
+  /** Interest / area / must-have multi-selects. */
   tag?: string
   /** Commute tolerance, in minutes. `null` means "no limit". */
   minutes?: number | null
   /** Monthly budget band, HKD. `null` means "no ceiling". */
   budgetMin?: number
   budgetMax?: number | null
-  /** Minimum room size, sq ft. `null` means "any". */
+  /** Minimum whole-flat size, sq ft. `null` means "any". */
   sizeMin?: number | null
+  /** How many other people you'd share with. Drives the household budget. */
+  roommates?: number
+  /** How often you cook at home. Unscored — an icebreaker and a home filter. */
+  cooks?: "every day" | "often" | "rarely" | "never"
   /** Smoking rule for the flat, plus the answerer's own status. */
   smoking?: "required_non_smoking" | "no_preference"
   /** 1 = the answerer does not smoke, 0 = they do. */
   selfSmoking?: number
+  /** Year of study, as displayed on the profile. */
+  studyYear?: string
 }
 
 export type QuizQuestion = {
@@ -89,23 +106,74 @@ export type QuizQuestion = {
   eyebrow: string
   title: string
   hint: string
-  /** "scale" | "mbti" | "multi" | "choice" — drives how the UI renders it. */
-  kind: "scale" | "mbti" | "multi" | "choice"
+  /** "scale" | "mbti" | "multi" | "choice" | "text" — drives how the UI renders. */
+  kind: "scale" | "mbti" | "multi" | "choice" | "text"
   /** The Profile key this question writes to. */
   factor: string
   /** Multi-select questions only. */
   max?: number
   /** Optional questions may be skipped. */
   optional?: boolean
+  /**
+   * Consecutive questions sharing a `group` render on ONE page — used to put
+   * the two gender questions together and the two belief questions together.
+   */
+  group?: string
+  /** Free-text questions only: placeholder and length cap. */
+  placeholder?: string
+  maxLength?: number
   options: QuizOption[]
 }
 
+/** One answer: an option index, a set of indices, or free text. */
+export type Answer = number | number[] | string | undefined
+
 export const QUIZ: QuizQuestion[] = [
+  // --- about you (neither scored nor gated) --------------------------------
+  // Added 14 Oct, second pass. The owner's question was "why is info like study
+  // year and major available in the profile but not in the quiz?" — and the
+  // answer was that it was NOT available: the curated demo cast bakes
+  // "Year 2 · Sociology" into its `school` string, so the cast *looked* like it
+  // carried these and the owner's own profile carried nothing. Two real
+  // questions, two real Profile fields, two real columns. They are display
+  // only — no factor, no gate, and the matcher never reads them.
+  {
+    id: "study_year",
+    section: "you",
+    eyebrow: "About you",
+    title: "Which year are you in?",
+    hint: "Shown on your profile. It never filters anybody out.",
+    kind: "choice",
+    factor: "study_year",
+    group: "you",
+    options: [
+      { title: "Year 1", studyYear: "Year 1" },
+      { title: "Year 2", studyYear: "Year 2" },
+      { title: "Year 3", studyYear: "Year 3" },
+      { title: "Year 4 or above", studyYear: "Year 4+" },
+      { title: "Postgraduate", studyYear: "Postgraduate" },
+      { title: "On exchange", detail: "Here for a term or a year.", studyYear: "Exchange" },
+    ],
+  },
+  {
+    id: "major",
+    section: "you",
+    eyebrow: "About you",
+    title: "What are you studying?",
+    hint: "A few words is plenty — it goes next to your university on your profile.",
+    kind: "text",
+    factor: "major",
+    group: "you",
+    placeholder: "e.g. Sociology",
+    maxLength: 40,
+    options: [],
+  },
+
   // --- how you live (soft, scored) -----------------------------------------
   // The owner's demo boundary is a short questionnaire, so the six soft
   // lifestyle factors are elicited by TWO composite questions instead of six
   // separate ones. Every option still writes concrete 0..1 values for each of
-  // its factors, so the matcher's input is unchanged — the score is still
+  // its factors, so the matcher's input is unchanged — the comparison is still
   // factor-by-factor over the same six factors, never an archetype label.
   {
     id: "home_rhythm",
@@ -249,6 +317,35 @@ export const QUIZ: QuizQuestion[] = [
     max: 4,
     options: INTEREST_VOCAB.map((tag) => ({ title: tag, tag })),
   },
+  {
+    id: "cook_at_home",
+    section: "bonding",
+    eyebrow: "The kitchen",
+    title: "How often do you actually cook?",
+    hint: "Not scored — but it decides whether the kitchen matters to you.",
+    kind: "choice",
+    factor: "cook_at_home",
+    optional: true,
+    options: [
+      { title: "Most nights", detail: "The kitchen is the point.", cooks: "every day" },
+      { title: "A few times a week", cooks: "often" },
+      { title: "Rarely — I'm out, or I order", cooks: "rarely" },
+      { title: "Never", detail: "I'll trade kitchen space for a bigger room.", cooks: "never" },
+    ],
+  },
+  {
+    id: "about_you_line",
+    section: "bonding",
+    eyebrow: "In your own words",
+    title: "Your line. The one that makes someone message you.",
+    hint: "Optional. This is the first thing people see — be a bit shocking.",
+    kind: "text",
+    factor: "tagline",
+    optional: true,
+    placeholder: "e.g. I will absolutely judge your rice cooker.",
+    maxLength: 90,
+    options: [],
+  },
 
   // --- non-negotiables (hard gate) -----------------------------------------
   {
@@ -260,6 +357,7 @@ export const QUIZ: QuizQuestion[] = [
     kind: "choice",
     factor: "gender_identity",
     optional: true,
+    group: "gender",
     options: [
       { title: "Woman", identity: "woman" },
       { title: "Man", identity: "man" },
@@ -272,11 +370,12 @@ export const QUIZ: QuizQuestion[] = [
     section: "nonneg",
     eyebrow: "Who you'd live with",
     title: "Who would you feel comfortable sharing a home with?",
-    hint: "A hard filter — it decides who you see, and never affects your score.",
+    hint: "A hard filter — it decides who you see.",
     kind: "choice",
     factor: "gender_preference",
+    group: "gender",
     options: [
-      { title: "Anyone", detail: "Compatibility matters most.", anyGender: true },
+      { title: "Anyone", detail: "Getting on matters most.", anyGender: true },
       { title: "Women only", categories: ["woman"] },
       { title: "Men only", categories: ["man"] },
       { title: "Non-binary / other", categories: ["nonbinary"] },
@@ -291,6 +390,7 @@ export const QUIZ: QuizQuestion[] = [
     kind: "choice",
     factor: "belief_system",
     optional: true,
+    group: "belief",
     options: [
       { title: "No religion", belief: "no religion" },
       { title: "Christianity", belief: "christianity" },
@@ -309,6 +409,7 @@ export const QUIZ: QuizQuestion[] = [
     hint: "Most people say no. If you say yes, we only show you people who match.",
     kind: "choice",
     factor: "belief_preference",
+    group: "belief",
     options: [
       { title: "No — it isn't something I filter on", detail: "Recommended.", anyBelief: true },
       { title: "Yes — I'd rather live with someone who shares mine" },
@@ -319,7 +420,7 @@ export const QUIZ: QuizQuestion[] = [
     section: "nonneg",
     eyebrow: "Where you'd live",
     title: "Which areas would you actually consider?",
-    hint: "Pick as many as you like. We use your campus to estimate the commute.",
+    hint: "Pick as many as you like. We use your campus to estimate the journey.",
     kind: "multi",
     factor: "target_areas",
     max: 6,
@@ -328,9 +429,9 @@ export const QUIZ: QuizQuestion[] = [
   {
     id: "max_commute",
     section: "nonneg",
-    eyebrow: "The commute",
+    eyebrow: "The journey",
     title: "How long is too long to get to campus?",
-    hint: "We estimate this from district to district — it is a guide, not a journey planner.",
+    hint: "Travel time, not distance — estimated district to district, so it is a guide rather than a journey planner.",
     kind: "choice",
     factor: "max_commute",
     options: [
@@ -347,7 +448,7 @@ export const QUIZ: QuizQuestion[] = [
     section: "nonneg",
     eyebrow: "Budget",
     title: "What can you pay each month?",
-    hint: "Your ceiling is a hard filter — we never show you somewhere you can't afford.",
+    hint: "Your share. We multiply it by everyone moving in to price whole flats.",
     kind: "choice",
     factor: "budget",
     options: [
@@ -359,19 +460,47 @@ export const QUIZ: QuizQuestion[] = [
     ],
   },
   {
-    id: "room_size",
+    id: "roommate_count",
     section: "nonneg",
-    eyebrow: "Room size",
-    title: "How small is too small?",
-    hint: "A hard filter, so nobody wastes a viewing on a room they'd never take.",
+    eyebrow: "The household",
+    title: "How many other people are you happy sharing with?",
+    hint: "This sets your household budget — your ceiling times everyone moving in.",
     kind: "choice",
-    factor: "room_size",
+    factor: "roommate_count",
+    options: [
+      { title: "One other person", detail: "A two-person flat.", roommates: 1 },
+      { title: "Two others", roommates: 2 },
+      { title: "Three others", roommates: 3 },
+      { title: "Four or more", detail: "The more the merrier.", roommates: 4 },
+    ],
+  },
+  {
+    id: "flat_size",
+    section: "nonneg",
+    eyebrow: "Flat size",
+    title: "How small is too small — for the whole flat?",
+    hint: "A preference, not a filter. We flag homes outside it; we never hide people because of it.",
+    kind: "choice",
+    factor: "flat_size",
     options: [
       { title: "Any size — I'm flexible", sizeMin: null },
-      { title: "At least 60 sq ft", sizeMin: 60 },
-      { title: "At least 100 sq ft", sizeMin: 100 },
-      { title: "At least 150 sq ft", sizeMin: 150 },
+      { title: "At least 400 sq ft", sizeMin: 400 },
+      { title: "At least 600 sq ft", sizeMin: 600 },
+      { title: "At least 800 sq ft", sizeMin: 800 },
+      { title: "At least 1,000 sq ft", sizeMin: 1000 },
     ],
+  },
+  {
+    id: "must_haves",
+    section: "nonneg",
+    eyebrow: "Must-haves",
+    title: "Pick five things the home has to have.",
+    hint: "Used to sort the homes you save — not to filter people out.",
+    kind: "multi",
+    factor: "must_haves",
+    max: 5,
+    optional: true,
+    options: MUST_HAVE_OPTIONS.map((tag) => ({ title: tag, tag })),
   },
   {
     id: "smoking",
@@ -397,30 +526,84 @@ export const QUIZ: QuizQuestion[] = [
   },
 ]
 
+export type QuizPage = {
+  group?: string
+  section: QuizSection
+  questions: Array<{ question: QuizQuestion; index: number }>
+}
+
+/**
+ * Questions grouped into pages. Consecutive questions sharing a `group` land on
+ * one screen (the two gender questions, the two belief questions); everything
+ * else gets a page of its own. Answers are still keyed by the GLOBAL question
+ * index, so nothing downstream changes.
+ */
+export const QUIZ_PAGES: QuizPage[] = (() => {
+  const pages: QuizPage[] = []
+  QUIZ.forEach((question, index) => {
+    const last = pages[pages.length - 1]
+    if (
+      last &&
+      question.group &&
+      last.group === question.group &&
+      last.section === question.section
+    ) {
+      last.questions.push({ question, index })
+    } else {
+      pages.push({
+        group: question.group,
+        section: question.section,
+        questions: [{ question, index }],
+      })
+    }
+  })
+  return pages
+})()
+
 export type ProfileOptions = {
-  /** From the verified institution — the anchor for every commute estimate. */
+  /** From the verified institution — the anchor for every journey estimate. */
   campusDistrict?: string | null
 }
 
 /**
- * Turn the raw answer indices into a Profile the matcher understands.
+ * Turn the raw answers into a Profile the matcher understands.
  * Single-select questions contribute one index; multi-select questions
- * contribute an array of indices.
+ * contribute an array of indices; text questions contribute a string.
  */
 export function answersToProfile(
-  answers: (number | number[] | undefined)[],
+  answers: Answer[],
   options: ProfileOptions = {},
 ): Profile {
   const about_me: Record<string, number> = {}
-  const looking_for: Profile["looking_for"] = {}
+  const looking_for: NonNullable<Profile["looking_for"]> = {}
   const letters: Record<string, string> = {}
   const multi: Record<string, string[]> = {}
   const picked: Record<string, QuizOption> = {}
+  let tagline: string | null = null
+  let major: string | null = null
+  let cooks: Profile["cooks_at_home"] = null
+  let roommates: number | null = null
 
   QUIZ.forEach((q, i) => {
     const choice = answers[i]
     if (choice === undefined) return
-    const indices = Array.isArray(choice) ? choice : [choice]
+
+    if (q.kind === "text") {
+      if (typeof choice === "string" && choice.trim()) {
+        const value = choice.trim().slice(0, q.maxLength ?? 90)
+        // Two free-text questions exist, and they are not interchangeable:
+        // `tagline` is the icebreaker line, `major` is a profile field.
+        if (q.factor === "major") major = value
+        else tagline = value
+      }
+      return
+    }
+
+    const indices = Array.isArray(choice)
+      ? choice
+      : typeof choice === "number"
+        ? [choice]
+        : []
     const chosen = indices
       .map((j) => q.options[j])
       .filter((o): o is QuizOption => Boolean(o))
@@ -451,6 +634,8 @@ export function answersToProfile(
         letters[axis] = letter
       }
     }
+    if (option.cooks) cooks = option.cooks
+    if (typeof option.roommates === "number") roommates = option.roommates
   })
 
   // Gender preference (identity is read from `picked` below).
@@ -479,8 +664,11 @@ export function answersToProfile(
   const budgetMin = budget?.budgetMin ?? null
   const budgetMax = budget?.budgetMax ?? null
 
-  const size = picked.room_size
-  if (size) looking_for.room_size_min = size.sizeMin ?? null
+  // Flat size is a PREFERENCE now, not a gate (owner, 14 Oct). Recorded so the
+  // UI can warn when a suggested home is out of range; never used to hide
+  // anyone.
+  const size = picked.flat_size
+  if (size) looking_for.flat_size_min = size.sizeMin ?? null
 
   const smoking = picked.smoking
   looking_for.smoking_rule = smoking?.smoking ?? "no_preference"
@@ -505,7 +693,13 @@ export function answersToProfile(
     area: targetAreas[0] ?? null,
     budget_min: budgetMin,
     budget_max: budgetMax,
-    room_size: null,
+    flat_size: null,
+    household_size: roommates === null ? null : roommates + 1,
+    must_haves: multi.must_haves ?? [],
+    cooks_at_home: cooks,
+    tagline,
+    study_year: picked.study_year?.studyYear ?? null,
+    major,
     interests: multi.interests ?? [],
   }
 }
@@ -513,4 +707,138 @@ export function answersToProfile(
 /** The questions in one section, in order — used by the progress UI. */
 export function sectionOf(index: number): QuizSection {
   return QUIZ[index]?.section ?? "lifestyle"
+}
+
+/**
+ * The inverse of `answersToProfile`, as far as it can be.
+ *
+ * WHY IT IS NEEDED: "Edit my answers" and signing back in both have to open the
+ * quiz with your existing choices already ticked. Until 14 Oct (second pass) the
+ * answers array only existed in React state, so it was populated by taking the
+ * quiz in this session and blank otherwise — meaning a returning user was
+ * silently shown twenty empty questions and their old profile was one "Continue"
+ * away from being overwritten. This reconstructs the ticks from the saved
+ * profile instead.
+ *
+ * IT IS DELIBERATELY BEST-EFFORT. Anything it cannot recognise comes back
+ * `undefined`, and the quiz renders that question as unanswered. Guessing would
+ * be worse than a blank: pre-selecting an option the user never chose is a lie
+ * they might not notice before saving.
+ */
+export function answersFromProfile(profile: Profile): Answer[] {
+  const answers: Answer[] = Array(QUIZ.length).fill(undefined)
+  const looking = profile.looking_for ?? {}
+  const aboutMe = profile.about_me ?? {}
+  const multiSource: Record<string, string[] | null | undefined> = {
+    target_areas: profile.target_areas,
+    interests: profile.interests,
+    must_haves: profile.must_haves,
+  }
+
+  QUIZ.forEach((question, index) => {
+    // Free text.
+    if (question.kind === "text") {
+      if (question.factor === "major") answers[index] = profile.major ?? undefined
+      else if (question.factor === "tagline") {
+        answers[index] = profile.tagline ?? undefined
+      }
+      return
+    }
+
+    // Multi-select: match the option's tag against the stored array.
+    if (question.kind === "multi") {
+      const wanted = multiSource[question.factor]
+      if (!wanted?.length) return
+      const picked = question.options
+        .map((option, optionIndex) => ({ option, optionIndex }))
+        .filter(({ option }) => option.tag !== undefined && wanted.includes(option.tag))
+        .map(({ optionIndex }) => optionIndex)
+      if (picked.length) answers[index] = picked
+      return
+    }
+
+    // MBTI: the stored type is four letters; this question owns one axis.
+    if (question.kind === "mbti") {
+      const type = profile.mbti_type
+      if (!type || type.length !== 4) return
+      const axis = question.factor.replace("mbti_", "")
+      // The factor is named in the order the option writes it (`mbti_EI`), while
+      // lib/matching.ts validates against the alphabetical pair ("IE"). Getting
+      // this list wrong returned -1 and silently left both type questions blank
+      // for every returning user — caught by `npm run smoke`, not by tsc.
+      const position = ["EI", "SN", "TF", "JP"].indexOf(axis)
+      if (position === -1) return
+      const letter = type[position].toUpperCase()
+      const match = question.options.findIndex(
+        (option) => option.letter === letter || option.letters?.[question.factor] === letter,
+      )
+      if (match !== -1) answers[index] = match
+      return
+    }
+
+    // The belief requirement is a two-option boolean pair — "no, I don't
+    // filter on it" vs "yes, they must share mine" — and `answersToProfile`
+    // always resolves it to one of the two, so it is matched positionally.
+    if (question.factor === "belief_preference") {
+      answers[index] = looking.any_belief === true ? 0 : 1
+      return
+    }
+
+    // Choice questions carry their meaning on the option payload, so each one is
+    // matched against the field it writes rather than against the label text.
+    const matches = (option: QuizOption): boolean => {
+      switch (question.factor) {
+        case "study_year":
+          return Boolean(option.studyYear) && option.studyYear === profile.study_year
+        case "gender_identity":
+          return Boolean(option.identity) && option.identity === profile.gender_identity
+        case "gender_preference": {
+          if (looking.any_gender === true) return option.anyGender === true
+          const theirs = option.categories
+          if (!theirs) return false
+          return theirs.join() === (looking.roommate_gender_categories ?? []).join()
+        }
+        case "belief_system":
+          return Boolean(option.belief) && option.belief === profile.belief_system
+        case "max_commute":
+          return (option.minutes ?? null) === (looking.max_commute_minutes ?? null)
+        case "budget":
+          return (
+            (option.budgetMin ?? null) === (profile.budget_min ?? null) &&
+            (option.budgetMax ?? null) === (profile.budget_max ?? null)
+          )
+        case "roommate_count":
+          return (
+            option.roommates !== undefined &&
+            profile.household_size !== null &&
+            profile.household_size !== undefined &&
+            option.roommates + 1 === profile.household_size
+          )
+        case "flat_size":
+          return (option.sizeMin ?? null) === (looking.flat_size_min ?? null)
+        case "smoking":
+          return Boolean(option.smoking) && option.smoking === looking.smoking_rule
+        case "cook_at_home":
+          return Boolean(option.cooks) && option.cooks === profile.cooks_at_home
+        default:
+          return false
+      }
+    }
+
+    // A plain scale writes `value`; a composite writes one entry per factor.
+    const scaleMatch = (option: QuizOption): boolean => {
+      const target = aboutMe[question.factor]
+      if (typeof target !== "number") return false
+      if (typeof option.value === "number") return option.value === target
+      return option.values?.[question.factor] === target
+    }
+
+    const found = question.options.findIndex((option) => {
+      if (question.kind === "scale") return scaleMatch(option)
+      return matches(option)
+    })
+    if (found !== -1) answers[index] = found
+  })
+
+  return answers
 }

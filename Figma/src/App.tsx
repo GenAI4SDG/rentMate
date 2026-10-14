@@ -1,15 +1,33 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react"
 
-import { QUIZ, SECTIONS, answersToProfile } from "./lib/quiz"
+import {
+  QUIZ,
+  QUIZ_PAGES,
+  SECTIONS,
+  answersFromProfile,
+  answersToProfile,
+  type Answer,
+  type QuizQuestion,
+} from "./lib/quiz"
 import { CURATED_CAST, DEMO_EMAIL, isAdminEmail, isCuratedEmail } from "./lib/demoData"
-import { LISTINGS, priceContext } from "./lib/listings"
+import {
+  LISTINGS,
+  LISTING_DISTRICTS,
+  STATUS_LABEL,
+  householdCeiling,
+  priceContext,
+  satisfiesMustHaves,
+  sharePerPerson,
+  type Listing,
+  type ListingStatus,
+} from "./lib/listings"
 import {
   INSTITUTIONS,
   TOTAL_DOMAINS,
   validateInstitutionEmail,
   type Institution,
 } from "./lib/institutions"
-import { areaFit } from "./lib/matching"
+import { areaFit, commuteMinutes, flatSizeWarningForHome } from "./lib/matching"
 import {
   REACTIONS,
   openerPrompt,
@@ -34,15 +52,37 @@ import {
   reportMessage,
   blockUser,
   getBlockedEmails,
+  deleteAccount,
+  forgetAccount,
   type BlockRow,
+  type HiddenMatch,
+  type LoadedAccount,
   type MatchFeed,
   type MatchView,
+  type ProfileSync,
   type ReportRow,
   type ChatMessage,
 } from "./lib/api"
-import type { Profile } from "./lib/matching"
+import type { GateFinding, Profile } from "./lib/matching"
 import { SAFETY_NOTES } from "./lib/safetyNotes"
 import { areaGuideFor } from "./lib/areaGuides"
+import { agentFor, agentThread, bookingRequestLine } from "./lib/agentUpdates"
+import { HkMap } from "./lib/HkMap"
+import {
+  DEMO_SEED,
+  EMPTY_PERSONAL,
+  clearPersonal,
+  loadPersonal,
+  savePersonal,
+  type PersonalState,
+  type Viewing,
+} from "./lib/personalStore"
+import {
+  deleteRemotePersonal,
+  loadListingPool,
+  loadRemotePersonal,
+  saveRemotePersonal,
+} from "./lib/homesApi"
 
 type Screen = "home" | "verify" | "quiz" | "matches"
 
@@ -80,6 +120,43 @@ const EMPTY_MATCH: MatchView = {
 type Message = { id?: string; from: "them" | "me"; text: string; time: string }
 
 /**
+ * One card in the match deck.
+ *
+ * `gate` is non-null only for the second tier — someone the hard filter removed,
+ * carried onto a card with the reason attached rather than dropped into a list.
+ * `passed` marks someone you already said "not for me" to, who is only back
+ * because the top tier ran out.
+ */
+type DeckEntry = {
+  view: MatchView
+  gate: GateFinding[] | null
+  passed: boolean
+}
+
+/**
+ * A gated person, rendered as a card.
+ *
+ * The hard gate never scored them, so there is no score, no hook and no
+ * narrative to show — and inventing one would be the exact dishonesty the
+ * "Others" list exists to avoid. The card says what it has and no more.
+ */
+function hiddenToView(person: HiddenMatch): MatchView {
+  return {
+    id: person.id,
+    name: person.name,
+    school: person.school ?? "Institution not shown",
+    area: "Not shown",
+    budget: "Not shown",
+    image: person.image,
+    score: null,
+    status: "insufficient_data",
+    narrative: null,
+    factors: {},
+    hooks: [],
+  }
+}
+
+/**
  * The commute note for a match's target area. Deliberately shows the word
  * "estimated" — there is no journey API behind this, only district centroids.
  */
@@ -93,7 +170,42 @@ function commuteNote(
   return fit ? fit.note : null
 }
 
-const scoreLabel = (score: number | null) => (score === null ? "—" : `${score}%`)
+/**
+ * Compatibility in words, not a number.
+ *
+ * The owner asked for every explicit "score" reference to go (14 Oct). The
+ * factor-by-factor comparison still runs underneath — it is what decides which
+ * hooks you are shown — but a percentage on a person's face reads like a rating
+ * of them, so the UI says what it means instead.
+ */
+function fitPhrase(score: number | null): string {
+  if (score === null) return "Not enough overlap yet"
+  if (score >= 85) return "Very similar rhythm"
+  if (score >= 70) return "Broadly similar"
+  if (score >= 55) return "Some overlap"
+  return "Different habits"
+}
+
+/**
+ * The one line under your own name: university, then year, then field.
+ *
+ * The demo cast has always shown "CUHK · Year 2 · Sociology" because it is baked
+ * into their `school` string; your own profile showed a university and stopped,
+ * because study year and major were not fields. They are now (see the "About
+ * you" quiz page), so this is the same sentence for you as for them.
+ */
+function identityLine(
+  profile: Profile | null,
+  institution: Institution | null,
+  email: string,
+): string {
+  const parts = [
+    institution?.name,
+    profile?.study_year ?? undefined,
+    profile?.major ?? undefined,
+  ].filter((part): part is string => Boolean(part))
+  return parts.length ? parts.join(" · ") : email
+}
 
 /** Marks a feature that is AI-generated in production but pre-written in this demo. */
 const GenBadge = ({ label }: { label: string }) => (
@@ -102,34 +214,21 @@ const GenBadge = ({ label }: { label: string }) => (
   </span>
 )
 
-const flats = LISTINGS
+// `flats` used to be the module constant LISTINGS. It is component state now so
+// the pool can come from Postgres when a project is configured — see
+// lib/homesApi.ts. LISTINGS stays the fallback, so nothing changes offline.
 
-const roomViews = [
-  {
-    name: "Living room",
-    dimensions: "4.2 × 3.6 m",
-    image:
-      "https://images.unsplash.com/photo-1631049035227-57752420e957?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1800",
-  },
-  {
-    name: "Main bedroom",
-    dimensions: "3.1 × 2.8 m",
-    image:
-      "https://images.unsplash.com/photo-1779785689520-bf24ef13aa71?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1500",
-  },
-  {
-    name: "Second bedroom",
-    dimensions: "2.9 × 2.7 m",
-    image:
-      "https://images.unsplash.com/photo-1791138961286-a9f5845171e4?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1500",
-  },
-  {
-    name: "Kitchen",
-    dimensions: "2.8 × 1.9 m",
-    image:
-      "https://images.unsplash.com/photo-1762811003338-aef30274513b?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1800",
-  },
-]
+/**
+ * Travel time from a district to a campus, as a sentence. Deliberately says
+ * "estimated" — there is no journey API behind this, only an offline model of
+ * district-to-district time in lib/matching.ts.
+ */
+function travelNote(area: string, campusDistrict: string | null): string | null {
+  if (!campusDistrict) return null
+  const minutes = commuteMinutes(area, campusDistrict)
+  if (minutes === null) return null
+  return `About ${minutes} min travel to ${campusDistrict} (estimated)`
+}
 
 function Icon({
   name,
@@ -374,7 +473,12 @@ function Verify({
   onVerified,
 }: {
   onBack: () => void
-  onVerified: (email: string, institution: Institution | null) => void
+  /** `existing` is the account already on file for that email, or null. */
+  onVerified: (
+    email: string,
+    institution: Institution | null,
+    existing: LoadedAccount | null,
+  ) => void
 }) {
   const [email, setEmail] = useState(DEMO_EMAIL)
   const [touched, setTouched] = useState(false)
@@ -395,7 +499,12 @@ function Verify({
     setError("")
     try {
       await requestVerification(email)
-      onVerified(email, check.institution)
+      // DO YOU ALREADY HAVE AN ACCOUNT? Signing out does not delete anything —
+      // the row is still there keyed on this email — so making a returning user
+      // re-answer twenty questions was both pointless and a data-loss risk: the
+      // old profile sat there until the first "Continue" overwrote it.
+      const existing = await loadAccount(email.trim().toLowerCase())
+      onVerified(email, check.institution, existing)
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Could not send the verification email.",
@@ -516,58 +625,210 @@ function Verify({
   )
 }
 
+/** One question block inside a page. Answers are keyed by the global index. */
+function QuestionBlock({
+  question,
+  index,
+  answer,
+  onAnswer,
+}: {
+  question: QuizQuestion
+  index: number
+  answer: Answer
+  onAnswer: (index: number, value: Answer) => void
+}) {
+  const multi = question.kind === "multi"
+  const selectedIndices = multi
+    ? Array.isArray(answer)
+      ? answer
+      : []
+    : typeof answer === "number"
+      ? [answer]
+      : []
+  const maxed =
+    multi && question.max !== undefined && selectedIndices.length >= question.max
+
+  function choose(optionIndex: number) {
+    if (!multi) {
+      onAnswer(index, optionIndex)
+      return
+    }
+    const current = selectedIndices
+    if (current.includes(optionIndex)) {
+      onAnswer(
+        index,
+        current.filter((i) => i !== optionIndex),
+      )
+    } else if (question.max === undefined || current.length < question.max) {
+      onAnswer(index, [...current, optionIndex])
+    }
+  }
+
+  if (question.kind === "text") {
+    const value = typeof answer === "string" ? answer : ""
+    return (
+      <div className="question-block free-text-block">
+        <p className="question-eyebrow">{question.eyebrow}</p>
+        <h1>{question.title}</h1>
+        <p className="question-hint">{question.hint}</p>
+        <textarea
+          className="free-text-input"
+          value={value}
+          maxLength={question.maxLength ?? 90}
+          rows={3}
+          placeholder={question.placeholder ?? "Say something only you would say."}
+          onChange={(event) => onAnswer(index, event.target.value)}
+        />
+        <small className="free-text-count">
+          {value.length} / {question.maxLength ?? 90} · this is the first thing
+          people read
+        </small>
+      </div>
+    )
+  }
+
+  return (
+    <div className="question-block">
+      <p className="question-eyebrow">{question.eyebrow}</p>
+      <h1>{question.title}</h1>
+      <p className="question-hint">{question.hint}</p>
+      <div
+        className={`option-grid ${multi ? "multi-options" : ""} ${
+          question.options.some((option) => option.tone) ? "colour-options" : ""
+        }`}
+      >
+        {question.options.map((option, optionIndex) => {
+          const isSelected = selectedIndices.includes(optionIndex)
+          const isDisabled = multi && !isSelected && maxed
+          return (
+            <button
+              key={option.title}
+              className={`option-card ${isSelected ? "selected" : ""} ${
+                isDisabled ? "dimmed" : ""
+              }`}
+              onClick={() => choose(optionIndex)}
+              disabled={isDisabled}
+            >
+              {option.tone ? (
+                <span
+                  className="colour-swatch"
+                  style={{ background: option.tone }}
+                />
+              ) : (
+                <span className="option-letter">
+                  {multi
+                    ? isSelected
+                      ? "✓"
+                      : "+"
+                    : String.fromCharCode(65 + optionIndex)}
+                </span>
+              )}
+              <span className="option-copy">
+                <b>{option.title}</b>
+                {option.detail && <small>{option.detail}</small>}
+              </span>
+              <span className="option-check">
+                <Icon name="check" size={15} />
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* THE AI AREA SUGGESTER — and it belongs on this question, not on the
+          Homes tab. The owner's framing (IP.rentmate.transparency) is that you
+          choose an area by its vibe and reputation, not only by its rent; the
+          guide was sitting one screen away, after you had already committed to
+          a district. It now appears here, as you tick.
+          Same source as the Homes district step (lib/areaGuides.ts), so the
+          two can never tell you different things about the same place. */}
+      {question.factor === "target_areas" && selectedIndices.length > 0 && (
+        <div className="area-suggester">
+          <p className="area-suggester-head">
+            <GenBadge label="area guide" />
+            <b>What you just picked, in a sentence.</b>
+          </p>
+          <ul>
+            {selectedIndices
+              .map((optionIndex) => question.options[optionIndex]?.tag)
+              .filter((tag): tag is string => Boolean(tag))
+              .map((tag) => {
+                const guide = areaGuideFor(tag)
+                if (!guide) return null
+                return (
+                  <li key={tag}>
+                    <b>{tag}</b>
+                    <em>{guide.vibe}</em>
+                    <small>{guide.communityReputation}</small>
+                  </li>
+                )
+              })}
+          </ul>
+        </div>
+      )}
+
+      <p className="question-footer-note">
+        {multi
+          ? `${selectedIndices.length} selected${
+              question.max !== undefined ? ` · up to ${question.max}` : ""
+            }`
+          : question.optional && selectedIndices.length === 0
+            ? "Optional — skip if you'd rather not say"
+            : selectedIndices.length === 0
+              ? "Choose one to continue"
+              : "Looking good — ready when you are"}
+      </p>
+    </div>
+  )
+}
+
 function Quiz({
   onBack,
   onComplete,
+  initialAnswers,
 }: {
   onBack: () => void
-  onComplete: (answers: (number | number[] | undefined)[]) => void
+  onComplete: (answers: Answer[]) => void
+  /** Pre-filled when you come back to edit your answers. */
+  initialAnswers?: Answer[]
 }) {
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<(number | number[] | undefined)[]>([])
-  const question = questions[index]
-  const selection = answers[index]
-  const percent = ((index + 1) / questions.length) * 100
-  const section = SECTIONS[question.section]
-  const multi = question.kind === "multi"
-  const selectedIndices = multi
-    ? Array.isArray(selection)
-      ? selection
-      : []
-    : selection === undefined
-      ? []
-      : [selection as number]
-  const maxed = multi && question.max !== undefined && selectedIndices.length >= question.max
-  // Optional questions may be skipped; everything else needs an answer.
-  const canContinue = question.optional || selectedIndices.length > 0
+  const [pageIndex, setPageIndex] = useState(0)
+  const [answers, setAnswers] = useState<Answer[]>(
+    () => initialAnswers ?? Array(QUIZ.length).fill(undefined),
+  )
+  const page = QUIZ_PAGES[pageIndex]
+  const percent = ((pageIndex + 1) / QUIZ_PAGES.length) * 100
+  const section = SECTIONS[page.section]
 
-  function choose(optionIndex: number) {
-    const next = [...answers]
-    if (!multi) {
-      next[index] = optionIndex
-    } else {
-      const current = Array.isArray(next[index]) ? (next[index] as number[]) : []
-      if (current.includes(optionIndex)) {
-        next[index] = current.filter((i) => i !== optionIndex)
-      } else if (question.max === undefined || current.length < question.max) {
-        next[index] = [...current, optionIndex]
-      } else {
-        return
-      }
-    }
-    setAnswers(next)
+  function answered(entry: { question: QuizQuestion; index: number }): boolean {
+    if (entry.question.optional) return true
+    const value = answers[entry.index]
+    if (value === undefined) return false
+    if (Array.isArray(value)) return value.length > 0
+    if (typeof value === "string") return value.trim().length > 0
+    return true
+  }
+
+  const canContinue = page.questions.every(answered)
+
+  function setAnswer(index: number, value: Answer) {
+    setAnswers((current) => {
+      const next = [...current]
+      next[index] = value
+      return next
+    })
   }
 
   function previous() {
-    if (index === 0) onBack()
-    else setIndex(index - 1)
+    if (pageIndex === 0) onBack()
+    else setPageIndex(pageIndex - 1)
   }
 
   function next() {
     if (!canContinue) return
-    if (index === questions.length - 1) onComplete(answers)
+    if (pageIndex === QUIZ_PAGES.length - 1) onComplete(answers)
     else {
-      setIndex(index + 1)
+      setPageIndex(pageIndex + 1)
       window.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
@@ -579,18 +840,17 @@ function Quiz({
           <p className="section-kicker">Your Rent Mate profile</p>
           <h2>Little choices tell us a lot.</h2>
           <p>
-            We turn your everyday preferences into meaningful, explainable
-            matches.
+            We turn your everyday preferences into matches we can explain.
           </p>
           <div className="quiz-metrics">
             <span>
-              <b>{String(index + 1).padStart(2, "0")}</b> current
+              <b>{String(pageIndex + 1).padStart(2, "0")}</b> current
             </span>
             <span>
-              <b>{String(questions.length).padStart(2, "0")}</b> total
+              <b>{String(QUIZ_PAGES.length).padStart(2, "0")}</b> screens
             </span>
           </div>
-          <div className={`quiz-section-note ${question.section}`}>
+          <div className={`quiz-section-note ${page.section}`}>
             <b>{section.label}</b>
             <span>{section.blurb}</span>
           </div>
@@ -605,77 +865,43 @@ function Quiz({
               <Icon name="back" /> Back
             </button>
             <span>
-              {index + 1} of {questions.length}
+              {pageIndex + 1} of {QUIZ_PAGES.length}
             </span>
           </div>
           <div className="quiz-progress" aria-hidden="true">
             <span style={{ width: `${percent}%` }} />
           </div>
-          <p className="question-eyebrow">{question.eyebrow}</p>
-          <h1>{question.title}</h1>
-          <p className="question-hint">{question.hint}</p>
-          <div
-            className={`option-grid ${multi ? "multi-options" : ""} ${
-              question.options.some((option) => option.tone)
-                ? "colour-options"
-                : ""
-            }`}
-          >
-            {question.options.map((option, optionIndex) => {
-              const isSelected = selectedIndices.includes(optionIndex)
-              const isDisabled = multi && !isSelected && maxed
-              return (
-                <button
-                  key={option.title}
-                  className={`option-card ${isSelected ? "selected" : ""} ${
-                    isDisabled ? "dimmed" : ""
-                  }`}
-                  onClick={() => choose(optionIndex)}
-                  disabled={isDisabled}
-                >
-                  {option.tone ? (
-                    <span
-                      className="colour-swatch"
-                      style={{ background: option.tone }}
-                    />
-                  ) : (
-                    <span className="option-letter">
-                      {multi
-                        ? isSelected
-                          ? "✓"
-                          : "+"
-                        : String.fromCharCode(65 + optionIndex)}
-                    </span>
-                  )}
-                  <span className="option-copy">
-                    <b>{option.title}</b>
-                    {option.detail && <small>{option.detail}</small>}
-                  </span>
-                  <span className="option-check">
-                    <Icon name="check" size={15} />
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          {page.questions.map((entry, position) => (
+            <div
+              key={entry.question.id}
+              className={position > 0 ? "stacked-question" : undefined}
+            >
+              <QuestionBlock
+                question={entry.question}
+                index={entry.index}
+                answer={answers[entry.index]}
+                onAnswer={setAnswer}
+              />
+            </div>
+          ))}
           <div className="quiz-footer">
             <span>
-              {multi
-                ? `${selectedIndices.length} selected${
-                    question.max !== undefined ? ` · up to ${question.max}` : ""
-                  }`
-                : question.optional && selectedIndices.length === 0
-                  ? "Optional — skip if you'd rather not say"
-                  : selectedIndices.length === 0
-                    ? "Choose one to continue"
-                    : "Looking good — ready when you are"}
+              {canContinue
+                ? pageIndex === QUIZ_PAGES.length - 1
+                  ? "Ready when you are"
+                  : "Looking good"
+                : page.questions.length > 1
+                  ? "Answer both to continue"
+                  : "Choose one to continue"}
             </span>
             <button
               className="primary-button"
               disabled={!canContinue}
               onClick={next}
             >
-              {index === questions.length - 1 ? "See my starters" : "Continue"}{" "}
+              {pageIndex === QUIZ_PAGES.length - 1
+                ? "See my starters"
+                : "Continue"}{" "}
               <Icon name="arrow" />
             </button>
           </div>
@@ -693,32 +919,55 @@ const HOOK_FLAGS: Record<Hook["kind"], string> = {
   mbti: "How you'd get on",
 }
 
+/**
+ * What to tell someone whose pool came back empty. The point is to name the one
+ * filter doing the most damage, because "loosen your filters" is not advice.
+ */
+const FILTER_ADVICE: Record<string, string> = {
+  budget:
+    "Your budget ceiling is doing the most work here. Raising it — or looking with more people, which raises the household total — opens the most doors.",
+  location:
+    "Your travel-time limit is the tightest one. Ten more minutes adds whole districts.",
+  gender:
+    "Your roommate-gender preference is what's holding people back. Switching it to “anyone” is the single biggest change you can make.",
+  belief:
+    "Asking a flatmate to share your belief system is the narrowest filter most people set. Most people say no to it.",
+  smoking:
+    "Requiring a smoke-free home is ruling people out. You can raise it in the chat instead.",
+}
+
 function HookCard({
   match,
-  index,
-  total,
   campusDistrict,
   limit,
   reacted,
+  viewing,
   onReact,
   onOpen,
-  onNext,
+  onSayHi,
+  onPass,
 }: {
   match: MatchView
-  index: number
-  total: number
   campusDistrict: string | null
   limit: number | null
   reacted: { reaction: ReactionId; reply: string } | undefined
+  /** A viewing you have agreed with this person, if any. */
+  viewing?: Viewing
   onReact: (id: ReactionId) => void
   onOpen: () => void
-  onNext: () => void
+  /** Straight into the conversation. Was the "Next" button. */
+  onSayHi: () => void
+  /** Discard this profile. Was the big primary button. */
+  onPass: () => void
 }) {
-  const [saved, setSaved] = useState(false)
   const first = match.name.split(" ")[0]
   const hook = match.hooks[0] ?? null
   const others = match.hooks.slice(1, 3)
-  const note = commuteNote(match.area, campusDistrict, limit)
+  // Travel time, not distance — and labelled an estimate (see lib/matching.ts).
+  const note =
+    match.area && campusDistrict
+      ? (areaFit(match.area, campusDistrict, limit)?.note ?? null)
+      : null
 
   return (
     <article className="hook-card">
@@ -727,13 +976,11 @@ function HookCard({
         <span className="verified-chip">
           <Icon name="check" size={12} /> Verified student
         </span>
-        <button
-          className={`save-button ${saved ? "saved" : ""}`}
-          onClick={() => setSaved(!saved)}
-          aria-label={saved ? "Remove from saved" : "Save this match"}
-        >
-          <Icon name="heart" size={18} />
-        </button>
+        {viewing && (
+          <span className="portrait-reminder" title="You agreed to see a place">
+            <Icon name="home" size={14} /> {viewing.when}
+          </span>
+        )}
       </div>
 
       <div className="hook-body">
@@ -743,8 +990,13 @@ function HookCard({
             <p>{match.school}</p>
           </div>
           <div className="hook-score">
-            <b>{scoreLabel(match.score)}</b>
-            <span>lifestyle fit</span>
+            <b>{fitPhrase(match.score)}</b>
+            <span>how you'd get on</span>
+            {viewing && (
+              <i className="hook-reminder" title="You agreed to see a place">
+                Viewing {viewing.when}
+              </i>
+            )}
           </div>
         </header>
         {match.tagline && <p className="hook-tagline">{match.tagline}</p>}
@@ -765,9 +1017,32 @@ function HookCard({
               ))}
             </ul>
           )}
+
+          {/* Reacting still opens the conversation — that part was right. What
+              was wrong was the SIZE of it: four chips were the loudest thing on
+              the card, above the actual actions. They live in the bubble now,
+              next to the thing you are reacting to, and `pass` is gone because
+              discarding has a real button of its own at the bottom. */}
+          {!reacted && (
+            <div className="hook-reactions">
+              <span>React and the conversation opens</span>
+              {REACTIONS.filter((reaction) => reaction.id !== "pass").map(
+                (reaction) => (
+                  <button
+                    key={reaction.id}
+                    className={`react-${reaction.id}`}
+                    onClick={() => onReact(reaction.id)}
+                    title={reaction.hint}
+                  >
+                    {reaction.label}
+                  </button>
+                ),
+              )}
+            </div>
+          )}
         </div>
 
-        {reacted ? (
+        {reacted && (
           <div className="hook-reply">
             <img src={match.image} alt="" />
             <div>
@@ -776,20 +1051,6 @@ function HookCard({
               </small>
               <p>{reacted.reply}</p>
             </div>
-          </div>
-        ) : (
-          <div className="hook-reactions">
-            <span>React to open the conversation</span>
-            {REACTIONS.map((reaction) => (
-              <button
-                key={reaction.id}
-                className={`react-${reaction.id}`}
-                onClick={() => onReact(reaction.id)}
-                title={reaction.hint}
-              >
-                {reaction.label}
-              </button>
-            ))}
           </div>
         )}
 
@@ -810,13 +1071,21 @@ function HookCard({
           )}
         </dl>
 
+        {/* "See profile" takes the slot the reaction row used to hold. */}
+        <button className="outline-button hook-see-profile" onClick={onOpen}>
+          <Icon name="user" size={16} /> See {first}&apos;s profile
+        </button>
+
+        {/* The two things you can actually DO with a person. "Say hi" is the
+            biggest button on the card because it is the one that starts
+            something; discarding is quiet, and it no longer scrolls you to the
+            top of the page on the way out. */}
         <div className="hook-actions">
-          <button className="outline-button" onClick={onOpen}>
-            Full profile &amp; factors
+          <button className="outline-button hook-pass" onClick={onPass}>
+            Not for me
           </button>
-          <button className="primary-button" onClick={onNext}>
-            {index === total - 1 ? "Back to the start" : "Next starter"}{" "}
-            <Icon name="arrow" size={18} />
+          <button className="primary-button" onClick={onSayHi}>
+            Say hi <Icon name="arrow" size={18} />
           </button>
         </div>
       </div>
@@ -932,14 +1201,26 @@ function Matches({
   email,
   institution,
   profile,
-  onRestart,
+  profileSync,
+  restored,
+  onDismissRestored,
+  onEditAnswers,
+  onLogout,
 }: {
   email: string
   institution: Institution | null
   profile: Profile | null
-  onRestart: () => void
+  /** Where the last save landed — "server", "device", or null before one ran. */
+  profileSync: ProfileSync | null
+  /** True when this sign-in restored an existing account instead of starting one. */
+  restored: boolean
+  onDismissRestored: () => void
+  /** Reopens the quiz with your current answers. */
+  onEditAnswers: () => void
+  /** Leaves the account on this device; your answers are untouched. */
+  onLogout: () => void
 }) {
-  type WorkspaceTab = "matches" | "messages" | "flats" | "review"
+  type WorkspaceTab = "matches" | "messages" | "homes" | "review"
   const isAdmin = isAdminEmail(email)
   const [feed, setFeed] = useState<MatchFeed>({
     matches: [],
@@ -958,22 +1239,107 @@ function Matches({
   const [draft, setDraft] = useState("")
   const [blockedEmails, setBlockedEmails] = useState<string[]>([])
   const [reportedIds, setReportedIds] = useState<Record<string, boolean>>({})
-  const [viewingOpen, setViewingOpen] = useState(false)
-  const [viewingBooked, setViewingBooked] = useState<string | null>(null)
+
+  // --- homes: the pool, and YOUR cart --------------------------------------
+  // The listing pool. Starts as the built-in generator so the first paint is
+  // never empty, then swaps to the database pool if there is one — 240 rows
+  // against the 72 the browser can generate. See lib/homesApi.ts.
+  const [flats, setFlats] = useState<Listing[]>(LISTINGS)
+
+  // Saved listings used to be component state rendered as "shared with {person}".
+  // They are personal now (see lib/personalStore.ts) and persist across reloads.
+  const [personal, setPersonal] = useState<PersonalState>(() => {
+    const stored = loadPersonal(email)
+    // The curated demo account opens with a small saved list on purpose. The
+    // owner asked for the agency side of a booking to be visible, and a
+    // cancellation is only visible if a booking existed first — so the demo
+    // account starts with one of each state. Real accounts start empty.
+    if (isCuratedEmail(email) && stored.saved.length === 0) return DEMO_SEED
+    return stored
+  })
+  // The mirror must not run until the server has been READ. Without this gate the
+  // mount-time save fires with whatever localStorage held — which on a fresh
+  // browser is an empty shortlist — and `saveRemotePersonal` reconciles by
+  // deleting rows that are not in the payload. That would wipe the server copy
+  // moments before the load read it. So: read first, then start writing.
+  const [remoteReady, setRemoteReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [pool, remote] = await Promise.all([
+        loadListingPool(),
+        loadRemotePersonal(email),
+      ])
+      if (cancelled) return
+      if (pool.length > 0) setFlats(pool)
+      // `remote` is null when the server has nothing to say. Merging in that case
+      // would wipe a local shortlist, so we only adopt a non-empty answer.
+      if (remote) {
+        setPersonal((local) => ({
+          saved: remote.saved ?? local.saved,
+          notes: { ...local.notes, ...(remote.notes ?? {}) },
+          status: { ...local.status, ...(remote.status ?? {}) },
+          attached: { ...local.attached, ...(remote.attached ?? {}) },
+          viewings: remote.viewings?.length ? remote.viewings : local.viewings,
+          // Who you passed on is not on the server (there is no table for it —
+          // it is a local judgement, not shared state), so it stays local.
+          dismissedMatches: local.dismissedMatches,
+        }))
+      }
+      setRemoteReady(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [email])
+
+  // localStorage first, always: it is what the UI already rendered from, and it
+  // works with no backend at all. Postgres is written after, best effort.
+  useEffect(() => {
+    savePersonal(email, personal)
+    if (remoteReady) void saveRemotePersonal(email, personal)
+  }, [personal, email, remoteReady])
+
+  // Which homes sub-view: the shop window, or your saved list.
+  const [homesView, setHomesView] = useState<"browse" | "saved">("browse")
+  // District FIRST, then listings — the AI tips come while you scan, after the
+  // areas are already narrowed by travel time.
+  const [browseStep, setBrowseStep] = useState<"districts" | "listings">(
+    "districts",
+  )
+  const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [shortlist, setShortlist] = useState<number[]>([1])
-  const [selectedFlat, setSelectedFlat] = useState(flats[0])
-  const [tourFlat, setTourFlat] = useState<typeof flats[number] | null>(null)
+  // Real filter state. These used to be four dead buttons.
+  const [bedroomFilter, setBedroomFilter] = useState<0 | 1 | 2 | 3>(0)
+  const [withinBudget, setWithinBudget] = useState(true)
+  const [nearMtrOnly, setNearMtrOnly] = useState(false)
+  const [withinTravelLimit, setWithinTravelLimit] = useState(true)
+  const [mustHavesOnly, setMustHavesOnly] = useState(false)
+  const [selectedFlatId, setSelectedFlatId] = useState(flats[0].id)
+  const [tourFlatId, setTourFlatId] = useState<number | null>(null)
   const [tourAngle, setTourAngle] = useState(180)
   const [tourRoom, setTourRoom] = useState(0)
-  const [tourMode, setTourMode] = useState<"3d" | "ar">("3d")
-  const [arActive, setArActive] = useState(false)
-  const [arError, setArError] = useState("")
-  const [placedItem, setPlacedItem] = useState<"bed" | "desk" | "sofa" | null>(
-    null,
-  )
   const [mobileMap, setMobileMap] = useState(false)
-  const arVideoRef = useRef<HTMLVideoElement>(null)
+  // Conversations are found by the home they are about.
+  const [threadFilter, setThreadFilter] = useState<number | "all">("all")
+  // The common-sense check: ticked before you go, not read on the matches page.
+  const [viewingDraft, setViewingDraft] = useState<{
+    matchId: string
+    listingId: number
+    when: string
+    checked: string[]
+  } | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmReset, setConfirmReset] = useState("")
+  // Which home is waiting for you to choose a conversation. Non-null opens the
+  // picker; the value is the listing id.
+  const [sendPickerFor, setSendPickerFor] = useState<number | null>(null)
+  // "Sent to Ka Ming" — feedback that does not require leaving the page.
+  const [sentFlash, setSentFlash] = useState<{
+    listingId: number
+    name: string
+  } | null>(null)
   const panoramaDrag = useRef<{ startX: number; startAngle: number } | null>(
     null,
   )
@@ -981,19 +1347,151 @@ function Matches({
     () => email.split("@")[0].split(/[._-]/)[0] || "there",
     [email],
   )
-  const visibleFlats = flats.filter((flat) =>
-    `${flat.title} ${flat.area}`.toLowerCase().includes(search.toLowerCase()),
-  )
 
   const matches = feed.matches
   const hidden = feed.hidden
-  const current = matches[activeIndex] ?? null
-  const chatMatch = matches.find((m) => m.id === chatId) ?? matches[0] ?? EMPTY_MATCH
+
+  // --- the deck ------------------------------------------------------------
+  // "Not for me" used to advance an index and forget, so everyone you rejected
+  // was back on the next reload. The list of people you passed on lives in the
+  // personal store now (lib/personalStore.ts) and the deck is derived from it.
+  const dismissed = personal.dismissedMatches
+  const eligible = matches.filter((match) => !dismissed.includes(match.id))
+  const passedOn = matches.filter((match) => dismissed.includes(match.id))
+
+  /**
+   * Tier 1 is everyone eligible you have not passed on. When that empties, tier
+   * 2 is the people you passed on followed by the people your non-negotiables
+   * exclude — because the owner's rule is that there is ALWAYS somebody to look
+   * at, paired with the honesty that you are past the recommendations. Tier 2
+   * carries each person's gate reasons onto the card instead of hiding them in
+   * a list at the bottom of the page.
+   */
+  const deck: DeckEntry[] =
+    eligible.length > 0
+      ? eligible.map((view) => ({ view, gate: null, passed: false }))
+      : [
+          ...passedOn.map((view) => ({ view, gate: null, passed: true })),
+          ...hidden.map((person) => ({
+            view: hiddenToView(person),
+            gate: person.reasons,
+            passed: false,
+          })),
+        ]
+
+  const exhausted = eligible.length === 0 && deck.length > 0
+  // Clamped: the deck shrinks under the index the moment you dismiss someone.
+  const deckIndex = deck.length ? Math.min(activeIndex, deck.length - 1) : 0
+  const currentEntry = deck[deckIndex] ?? null
+  const current = currentEntry?.view ?? null
+
+  // Conversations are connections. Someone you discarded is not one — that is
+  // the point of discarding — so they leave the Messages tab too, and the open
+  // thread falls to the next person rather than to a stranger.
+  const connections = eligible
+  const chatMatch =
+    connections.find((match) => match.id === chatId) ??
+    connections[0] ??
+    EMPTY_MATCH
   const thread = threads[chatMatch.id] ?? []
-  // The verified institution is the commute anchor for every estimate on screen.
+  // The verified institution is the anchor for every travel estimate on screen.
   const campusDistrict = institution?.district ?? null
   const commuteLimit = profile?.looking_for?.max_commute_minutes ?? null
-  const areasToShow = (profile?.target_areas ?? []).slice(0, 3)
+  const targetAreas = profile?.target_areas ?? []
+  const mustHaves = profile?.must_haves ?? []
+
+  // Household budget: your ceiling times everyone moving in. This is the cap
+  // that was missing entirely — listings used to ignore your answers.
+  const household = profile?.household_size ?? null
+  const budgetCeiling = householdCeiling(profile?.budget_max, (household ?? 2) - 1)
+  const people = household ?? 2
+
+  const statusOf = (id: number): ListingStatus => personal.status[String(id)] ?? "available"
+  const savedIds = personal.saved
+  const attachedToChat = personal.attached[chatMatch.id] ?? []
+
+  /** Homes in one district that clear the household budget. */
+  const homesInArea = (area: string): Listing[] =>
+    flats.filter(
+      (flat) =>
+        flat.area === area &&
+        (budgetCeiling === null || flat.price <= budgetCeiling),
+    )
+
+  const visibleFlats = flats.filter((flat) => {
+    if (selectedArea && flat.area !== selectedArea) return false
+    if (budgetCeiling !== null && withinBudget && flat.price > budgetCeiling)
+      return false
+    if (bedroomFilter !== 0 && flat.bedrooms !== bedroomFilter) return false
+    if (nearMtrOnly && !flat.nearMtr) return false
+    if (withinTravelLimit && campusDistrict && commuteLimit !== null) {
+      const minutes = commuteMinutes(flat.area, campusDistrict)
+      if (minutes !== null && minutes > commuteLimit) return false
+    }
+    if (mustHavesOnly && mustHaves.length > 0) {
+      const have = satisfiesMustHaves(flat)
+      if (!mustHaves.some((want) => have.includes(want))) return false
+    }
+    if (search.trim()) {
+      const haystack = `${flat.title} ${flat.area} ${flat.details}`.toLowerCase()
+      if (!haystack.includes(search.trim().toLowerCase())) return false
+    }
+    return true
+  })
+
+  const selectedFlat = flats.find((flat) => flat.id === selectedFlatId) ?? flats[0]
+  const tourFlat = tourFlatId === null ? null : (flats.find((f) => f.id === tourFlatId) ?? null)
+  const tourRooms = tourFlat?.rooms ?? []
+  const currentViewing = (matchId: string) =>
+    personal.viewings.find((v) => v.matchId === matchId) ?? null
+
+  function patchPersonal(patch: (state: PersonalState) => PersonalState) {
+    setPersonal((state) => patch(state))
+  }
+
+  function toggleSaved(id: number) {
+    patchPersonal((state) => ({
+      ...state,
+      saved: state.saved.includes(id)
+        ? state.saved.filter((savedId) => savedId !== id)
+        : [...state.saved, id],
+    }))
+  }
+
+  function setStatus(id: number, status: ListingStatus) {
+    patchPersonal((state) => ({
+      ...state,
+      status: { ...state.status, [String(id)]: status },
+    }))
+  }
+
+  /**
+   * Push a home into a NAMED conversation.
+   *
+   * This used to take only a listing and silently target `chatMatch` — whichever
+   * thread happened to be open. From the Homes tab that meant posting a flat
+   * into a conversation you were not looking at, with no way to tell. The
+   * caller now has to say who (see `sendListingTo`, which asks).
+   */
+  function attachToChat(matchId: string, listingId: number) {
+    if (!matchId) return
+    patchPersonal((state) => {
+      const current = state.attached[matchId] ?? []
+      if (current.includes(listingId)) return state
+      return {
+        ...state,
+        attached: {
+          ...state.attached,
+          [matchId]: [...current, listingId],
+        },
+      }
+    })
+  }
+
+  /** Which conversation did you already send this home to? */
+  function sentToListing(matchId: string, listingId: number): boolean {
+    return (personal.attached[matchId] ?? []).includes(listingId)
+  }
 
   // Compute the feed once the profile is known. Prefers the Edge Function for the
   // score; lib/api.ts falls back to local scoring, and the hooks are local always.
@@ -1061,30 +1559,71 @@ function Matches({
   // district has no figure on file — "not provided" beats a fake comparison.
   const flatContext = priceContext(selectedFlat.area, selectedFlat.price)
 
-  /** Reacting is the opener: it sends the reaction and appends their cached reply. */
+  /**
+   * Reacting opens the conversation — it does NOT invent their reply.
+   *
+   * The old behaviour dropped a canned "them" message into the thread the moment
+   * you reacted, which read like they had already answered. Now: you react, you
+   * land in the conversation, and the app nudges you to suggest a home. Their
+   * cached reply is kept as the opener you can send, not as a message sent for
+   * them.
+   */
   function react(match: MatchView, reaction: ReactionId) {
-    const reply = replyFor(match, reaction, match.hooks[0] ?? null)
-    if (reaction === "pass" || !reply) {
-      advance()
+    // `pass` is no longer offered as a reaction chip — discarding has its own
+    // button — but the guard stays so a stale caller cannot silently no-op.
+    if (reaction === "pass") {
+      passOn(match)
       return
     }
-    setReacted((prev) => ({ ...prev, [match.id]: { reaction, reply } }))
+    setReacted((prev) => ({
+      ...prev,
+      [match.id]: {
+        reaction,
+        reply: replyFor(match, reaction, match.hooks[0] ?? null) ?? "",
+      },
+    }))
     setThreads((prev) => ({
       ...prev,
       [match.id]: [
         ...(prev[match.id] ?? []),
         { from: "me", text: reactionLabel(reaction), time: "Now" },
-        { from: "them", text: reply, time: "Now" },
       ],
     }))
+    startChat(match)
   }
 
-  function advance() {
-    if (!matches.length) return
-    setActiveIndex((index) => (index + 1) % matches.length)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+  /**
+   * Discard a profile.
+   *
+   * Records the decision (so they stay gone), then moves to the next card at
+   * the SAME position rather than incrementing — the deck loses one entry, so
+   * incrementing would skip whoever slid into that slot. And it does not
+   * scroll: the old "Next" button called `advance(true)`, which threw you to the
+   * top of the page every time you rejected someone.
+   */
+  function passOn(match: MatchView) {
+    const position = deck.findIndex((entry) => entry.view.id === match.id)
+    const remaining = deck.length - 1
+    patchPersonal((state) =>
+      state.dismissedMatches.includes(match.id)
+        ? state
+        : { ...state, dismissedMatches: [...state.dismissedMatches, match.id] },
+    )
+    // Keep the thread list honest: no connection, no conversation.
+    if (chatId === match.id) setChatId("")
+    setActiveIndex(Math.max(0, Math.min(position, remaining - 1)))
   }
 
+  /**
+   * There is no longer a neutral "next card" action.
+   *
+   * The old `advance(scroll = true)` was the biggest button on the card and it
+   * both discarded the person and scrolled the page to the top — the two
+   * complaints in the owner's review ("why is the biggest button, which says
+   * 'next', used to discard a profile?", "the page kinda jumps to the top").
+   * Moving between cards is the dot navigation under the card; the two things
+   * you can DO are Say hi and Not for me.
+   */
   function startChat(match: MatchView) {
     setChatId(match.id)
     setActiveMatch(null)
@@ -1133,19 +1672,68 @@ function Matches({
     )
   }
 
-  function bookViewing(slot: string) {
-    if (!chatMatch.id) return
-    const text = `Let's view this place together — how is ${slot}?`
-    setViewingBooked(slot)
-    setViewingOpen(false)
+  /**
+   * Times are agreed by talking, not by picking from four invented slots. So
+   * "send this home" is: ask who, attach it to that conversation, and post the
+   * suggestion as ordinary text.
+   */
+  function openSendPicker(listingId: number) {
+    if (!connections.length) return
+    setSendPickerFor(listingId)
+  }
+
+  function sendListingTo(matchId: string, listingId: number) {
+    const flat = flats.find((f) => f.id === listingId)
+    const person = connections.find((m) => m.id === matchId)
+    if (!flat || !person) return
+    attachToChat(matchId, listingId)
+    const share = sharePerPerson(flat.price, people)
+    pushMessageTo(
+      matchId,
+      `How about we go see “${flat.title}” in ${flat.area}? ${flat.priceLabel} for the whole flat — about $${share.toLocaleString("en-US")} each. When suits you?`,
+    )
+    setSendPickerFor(null)
+    // A confirmation you can actually see, without yanking you out of the list
+    // you were reading. Cleared by the next send.
+    setSentFlash({ listingId, name: person.name.split(" ")[0] })
+  }
+
+  /**
+   * Book a viewing with the listing agency.
+   *
+   * This replaces the status dropdown that used to sit on every listing. A
+   * dropdown let you declare a flat "taken" for no reason at all; a booking is
+   * an action with a counterparty, and the counterparty answers — see
+   * lib/agentUpdates.ts, which is what fills the agent panel on the saved page.
+   */
+  function bookWithAgency(listingId: number, matchId?: string) {
+    const flat = flats.find((f) => f.id === listingId)
+    if (!flat) return
+    setStatus(listingId, "viewing")
+    const target = matchId ?? chatMatch.id
+    if (target) {
+      pushMessageTo(
+        target,
+        `I've asked ${agentFor(listingId)} to show us “${flat.title}”. They'll confirm a time here.`,
+      )
+    }
+  }
+
+  /** Push text into a NAMED conversation, persisted when that chat is real. */
+  function pushMessageTo(matchId: string, text: string) {
+    if (!matchId) return
+    const target = matches.find((m) => m.id === matchId)
     const push = (id?: string) =>
       setThreads((prev) => ({
         ...prev,
-        [chatMatch.id]: [...(prev[chatMatch.id] ?? []), { id, from: "me", text, time: "Now" }],
+        [matchId]: [
+          ...(prev[matchId] ?? []),
+          { id, from: "me", text, time: "Now" },
+        ],
       }))
-    if (chatMatch.real && chatMatch.conversationId && !isBlocked(chatMatch)) {
+    if (target?.real && target.conversationId && !isBlocked(target)) {
       void sendChatMessage({
-        conversationId: chatMatch.conversationId,
+        conversationId: target.conversationId,
         senderEmail: email,
         text,
       }).then(push)
@@ -1154,50 +1742,35 @@ function Matches({
     }
   }
 
-  function toggleShortlist(id: number) {
-    setShortlist((current) =>
-      current.includes(id)
-        ? current.filter((flatId) => flatId !== id)
-        : [...current, id],
-    )
+  function pushMessage(text: string) {
+    pushMessageTo(chatMatch.id, text)
   }
 
-  function stopAr() {
-    const stream = arVideoRef.current?.srcObject as MediaStream | null
-    stream?.getTracks().forEach((track) => track.stop())
-    if (arVideoRef.current) arVideoRef.current.srcObject = null
-    setArActive(false)
+  /**
+   * Locking in a viewing requires ticking the common-sense list first. That list
+   * used to sit on the matches page where nobody read it; it belongs at the
+   * moment you commit to going somewhere with a stranger.
+   */
+  function confirmViewing() {
+    if (!viewingDraft || !chatMatch.id) return
+    if (viewingDraft.checked.length < SAFETY_NOTES.length) return
+    const viewing: Viewing = {
+      id: `${viewingDraft.matchId}-${viewingDraft.listingId}-${Date.now()}`,
+      matchId: viewingDraft.matchId,
+      listingId: viewingDraft.listingId,
+      when: viewingDraft.when.trim() || "time to be agreed",
+      confirmed: true,
+    }
+    patchPersonal((state) => ({ ...state, viewings: [...state.viewings, viewing] }))
+    setStatus(viewingDraft.listingId, "viewing")
+    pushMessage(`Viewing locked in — ${viewing.when}. See you there.`)
+    setViewingDraft(null)
   }
 
   function closeTour() {
-    stopAr()
-    setTourFlat(null)
-    setTourMode("3d")
-    setPlacedItem(null)
-    setArError("")
-  }
-
-  async function startAr() {
-    setArError("")
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setArError("Camera AR is not supported in this browser.")
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      })
-      if (arVideoRef.current) {
-        arVideoRef.current.srcObject = stream
-        await arVideoRef.current.play()
-        setArActive(true)
-      }
-    } catch {
-      setArError(
-        "Camera access was not available. Allow camera permission to use AR preview.",
-      )
-    }
+    setTourFlatId(null)
+    setTourRoom(0)
+    setTourAngle(180)
   }
 
   function rotateTour(amount: number) {
@@ -1206,9 +1779,54 @@ function Matches({
 
   function moveRoom(direction: 1 | -1) {
     setTourRoom(
-      (current) => (current + direction + roomViews.length) % roomViews.length,
+      (current) => (current + direction + tourRooms.length) % Math.max(1, tourRooms.length),
     )
     setTourAngle(180)
+  }
+
+  // Which of MY filters is holding back the most people — named in the empty
+  // state so "loosen one" means something specific.
+  const worstField = useMemo(() => {
+    const counts: Record<string, number> = {}
+    hidden.forEach((person) => {
+      person.reasons
+        .filter((reason) => reason.side === "you")
+        .forEach((reason) => {
+          counts[reason.field] = (counts[reason.field] ?? 0) + 1
+        })
+    })
+    return (
+      Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+    )
+  }, [hidden])
+
+  /** Which home each conversation is about, for the filter chips. */
+  const listingIdsInPlay = useMemo(() => {
+    const ids = new Set<number>()
+    Object.values(personal.attached).forEach((list) => list.forEach((id) => ids.add(id)))
+    personal.viewings.forEach((v) => ids.add(v.listingId))
+    return Array.from(ids).sort((a, b) => a - b)
+  }, [personal])
+
+  function visibleThreads() {
+    if (threadFilter === "all") return connections.filter((m) => !isBlocked(m))
+    return connections.filter(
+      (m) => !isBlocked(m) && (personal.attached[m.id] ?? []).includes(threadFilter),
+    )
+  }
+
+  function logOut() {
+    setMenuOpen(false)
+    onLogout()
+  }
+
+  async function resetAccount() {
+    await deleteAccount(email)
+    // Reset means reset: the profile row AND your saved homes / viewings. Log out
+    // deliberately does neither — see logOut() below.
+    await deleteRemotePersonal(email)
+    clearPersonal(email)
+    window.location.reload()
   }
 
   return (
@@ -1229,10 +1847,11 @@ function Matches({
             <Icon name="chat" size={17} /> Messages
           </button>
           <button
-            className={tab === "flats" ? "active" : ""}
-            onClick={() => setTab("flats")}
+            className={tab === "homes" ? "active" : ""}
+            onClick={() => setTab("homes")}
           >
-            <Icon name="home" size={17} /> Find a flat
+            <Icon name="home" size={17} /> Homes
+            {savedIds.length > 0 && <i className="tab-count">{savedIds.length}</i>}
           </button>
           {isAdmin && (
             <button
@@ -1243,21 +1862,99 @@ function Matches({
             </button>
           )}
         </nav>
-        {/* Identity READOUT, not a control. The Figma export wired this chip to
-            "start over", so a stray click on your own avatar threw away your
-            session and dropped you back at the home screen. Restarting is now
-            an explicit, labelled action. */}
-        <div className="profile-chip">
-          <span>{firstName.slice(0, 1).toUpperCase()}</span>
-          <span>
-            <b>{firstName}</b>
-            <small>{institution?.name ?? email}</small>
-          </span>
+
+        {/* The profile chip is a MENU now, not a readout. "Start over" used to
+            sit in the nav bar as a bare button, one stray click from wiping
+            everything; it is behind this menu and behind a typed confirmation. */}
+        <div className="profile-menu-wrap">
+          <button
+            className="profile-chip profile-chip-button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-label="Account menu"
+          >
+            <span>{firstName.slice(0, 1).toUpperCase()}</span>
+            <span>
+              <b>{firstName}</b>
+              <small>{identityLine(profile, institution, email)}</small>
+            </span>
+          </button>
+          {menuOpen && (
+            <div className="profile-menu">
+              {/* Your own profile, as other people see it. Study year and major
+                  are here because they are now real fields with real answers —
+                  see the "About you" quiz page. */}
+              <div className="menu-identity">
+                <b>{institution?.name ?? "Institution not set"}</b>
+                <span>
+                  {[profile?.study_year, profile?.major]
+                    .filter(Boolean)
+                    .join(" · ") || "Year and major not answered yet"}
+                </span>
+                <small className={`sync-note ${profileSync ?? backendMode}`}>
+                  {profileSync === "server"
+                    ? "Your answers are saved to the server."
+                    : profileSync === "device"
+                      ? "Saved on this device only — the server did not accept the write."
+                      : backendMode === "supabase"
+                        ? "Connected to the server."
+                        : "No server configured — this browser is the only copy."}
+                </small>
+              </div>
+              <button onClick={onEditAnswers}>
+                <Icon name="user" size={16} /> Edit my answers
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  setTab("homes")
+                  setHomesView("saved")
+                }}
+              >
+                <Icon name="heart" size={16} /> Saved homes ({savedIds.length})
+              </button>
+              <button onClick={logOut}>
+                <Icon name="back" size={16} /> Log out
+              </button>
+              <div className="menu-danger">
+                <p>Resetting deletes your answers on this device and the server.</p>
+                <input
+                  value={confirmReset}
+                  onChange={(event) => setConfirmReset(event.target.value)}
+                  placeholder="Type RESET to confirm"
+                />
+                <button
+                  className="danger-button"
+                  disabled={confirmReset.trim().toUpperCase() !== "RESET"}
+                  onClick={() => void resetAccount()}
+                >
+                  Reset account
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <button className="start-over" onClick={onRestart}>
-          Start over
-        </button>
       </header>
+
+      {/* Signing back in restores the account rather than restarting the quiz.
+          Said once, and dismissable, because it explains why the app did not
+          ask you twenty questions again. */}
+      {restored && (
+        <div className={`restored-banner ${profileSync ?? backendMode}`}>
+          <Icon name="check" size={15} />
+          <p>
+            <b>Welcome back — we found your account.</b>
+            <span>
+              {profileSync === "server"
+                ? "Loaded from the server, with your saved homes and viewings."
+                : "Loaded from this device. Your answers are the same ones you left."}
+            </span>
+          </p>
+          <button onClick={onDismissRestored} aria-label="Dismiss">
+            <Icon name="back" size={15} />
+          </button>
+        </div>
+      )}
 
       {tab === "matches" && (
         <>
@@ -1272,43 +1969,98 @@ function Matches({
                 like a <em>good fit.</em>
               </h1>
             </div>
-            <p>
-              No grid, no swiping. Each card opens with one real thing you two
-              have in common — react to it and the conversation has already
-              started.
-            </p>
+            {/* The line that used to sit here — "No grid, no swiping. Each card
+                opens with one real thing you two have in common…" — is deleted
+                at the owner's request. The card demonstrates that by doing it. */}
+            <dl className="hero-stats">
+              <div>
+                <dt>In your deck</dt>
+                <dd>{deck.length}</dd>
+              </div>
+              <div>
+                <dt>You passed on</dt>
+                <dd>{dismissed.length}</dd>
+              </div>
+              <div>
+                <dt>Outside your rules</dt>
+                <dd>{hidden.length}</dd>
+              </div>
+            </dl>
           </section>
           <section className="match-section">
             <div className="match-toolbar">
               <p>
                 <b>
                   {loadingMatches
-                    ? "Finding compatible students…"
-                    : `${matches.length} ${
-                        matches.length === 1 ? "person" : "people"
-                      } cleared your non-negotiables`}
+                    ? "Finding students you'd get on with…"
+                    : deck.length === 0
+                      ? "No one in the pool yet"
+                      : exhausted
+                        ? "Past our recommendations — here's who's left"
+                        : `${deck.length} ${
+                            deck.length === 1 ? "person" : "people"
+                          } you can message`}
                 </b>
                 <span>
                   {backendMode === "supabase"
-                    ? "Supabase connected · chat + profiles persisted · scored in your browser"
+                    ? "Supabase connected · chat + profiles persisted · compared in your browser"
                     : "Demo mode · everything in your browser"}
                   {campusDistrict ? ` · anchored to ${campusDistrict}` : ""}
                 </span>
               </p>
-              {matches.length > 0 && (
+              {deck.length > 0 && (
                 <span className="hook-counter">
-                  {activeIndex + 1} / {matches.length}
+                  {deckIndex + 1} / {deck.length}
                 </span>
               )}
             </div>
 
-            {loadingMatches && <p className="hook-empty">Scoring your answers…</p>}
+            {loadingMatches && (
+              <p className="hook-empty">Working through your answers…</p>
+            )}
 
-            {!loadingMatches && matches.length === 0 && (
-              <p className="hook-empty">
-                Nobody cleared your non-negotiables. That's the filters working,
-                not a bug — loosen one to see more people.
-              </p>
+            {/* TIER 2. The deck never runs dry — but it says when you are past
+                the people it would actually have picked for you. */}
+            {!loadingMatches && exhausted && (
+              <div className="deck-exhausted">
+                <Icon name="spark" size={16} />
+                <div>
+                  <b>That's everyone we'd have recommended.</b>
+                  <p>
+                    You've been through the people who fit your non-negotiables.
+                    What's left is the ones you passed on, and the ones your own
+                    rules exclude — shown with the rule that excluded them, so
+                    you can decide whether it was worth it. Loosen one and they
+                    move back into the main deck.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* An empty pool needs an answer, not a pat on the head. */}
+            {!loadingMatches && deck.length === 0 && (
+              <div className="empty-state-card">
+                <h2>No one fits yet. Here's the shortest way out.</h2>
+                <p>
+                  {hidden.length > 0
+                    ? `${hidden.length} ${hidden.length === 1 ? "person is" : "people are"} in the pool — your non-negotiables are holding every one of them back.`
+                    : "The pool is empty right now. You'll see people here as other students verify."}
+                </p>
+                {worstField && (
+                  <p className="empty-advice">
+                    <Icon name="spark" size={15} /> {FILTER_ADVICE[worstField]}
+                  </p>
+                )}
+                <div className="empty-actions">
+                  <button className="primary-button" onClick={onEditAnswers}>
+                    Loosen a non-negotiable <Icon name="arrow" size={17} />
+                  </button>
+                </div>
+                <p className="empty-footnote">
+                  Flat size never blocks anyone — it only flags homes outside
+                  your range. Everything else you set does.
+                </p>
+              </div>
             )}
 
             {current && (
@@ -1316,23 +2068,48 @@ function Matches({
                 <HookCard
                   key={current.id}
                   match={current}
-                  index={activeIndex}
-                  total={matches.length}
                   campusDistrict={campusDistrict}
                   limit={commuteLimit}
                   reacted={reacted[current.id]}
+                  viewing={currentViewing(current.id) ?? undefined}
                   onReact={(id) => react(current, id)}
                   onOpen={() => setActiveMatch(current)}
-                  onNext={advance}
+                  onSayHi={() => startChat(current)}
+                  onPass={() => passOn(current)}
                 />
-                {matches.length > 1 && (
+
+                {/* On a tier-2 card, the reason you are looking at them is on
+                    the card, not buried in a list. */}
+                {currentEntry?.gate && (
+                  <div className="deck-gate">
+                    <b>
+                      <Icon name="lock" size={14} /> Why we didn't show them first
+                    </b>
+                    <ul>
+                      {currentEntry.gate.map((reason) => (
+                        <li key={`${reason.field}-${reason.side}`}>
+                          {reason.side === "you" ? "You: " : "Them: "}
+                          {reason.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {currentEntry?.passed && (
+                  <p className="deck-gate deck-gate-passed">
+                    You passed on {current.name.split(" ")[0]} earlier. They're
+                    back because the deck is down to its last few.
+                  </p>
+                )}
+
+                {deck.length > 1 && (
                   <nav className="hook-dots" aria-label="Match navigation">
-                    {matches.map((match, index) => (
+                    {deck.map((entry, index) => (
                       <button
-                        key={match.id}
-                        className={index === activeIndex ? "active" : ""}
+                        key={entry.view.id}
+                        className={index === deckIndex ? "active" : ""}
                         onClick={() => setActiveIndex(index)}
-                        aria-label={`Show ${match.name}`}
+                        aria-label={`Show ${entry.view.name}`}
                       />
                     ))}
                   </nav>
@@ -1340,21 +2117,31 @@ function Matches({
               </>
             )}
 
+            {/* OTHERS — the people your non-negotiables are holding back. It used
+                to be a collapsed <details> labelled "we hid N people"; the owner
+                asked for it to be a place you can actually look. */}
             {hidden.length > 0 && (
-              <details className="hidden-panel">
-                <summary>
-                  <Icon name="lock" size={15} /> We hid {hidden.length}{" "}
-                  {hidden.length === 1 ? "person" : "people"} because of your
-                  non-negotiables
-                </summary>
+              <section className="others-panel">
+                <header>
+                  <h3>
+                    <Icon name="lock" size={15} /> Others ({hidden.length})
+                  </h3>
+                  <p>
+                    These people are in the pool. Your non-negotiables are
+                    holding each of them back — and we tell you which one, which
+                    is the part most apps hide.
+                  </p>
+                </header>
                 <ul>
                   {hidden.map((person) => (
                     <li key={person.id}>
                       <img src={person.image} alt="" />
                       <span>
                         <b>{person.name}</b>
+                        <small className="others-school">{person.school}</small>
                         {person.reasons.map((reason) => (
                           <small key={`${reason.field}-${reason.side}`}>
+                            {reason.side === "you" ? "You: " : "Them: "}
                             {reason.text}
                           </small>
                         ))}
@@ -1362,11 +2149,10 @@ function Matches({
                     </li>
                   ))}
                 </ul>
-                <p className="hidden-note">
-                  This is the part most apps hide. The hard filters decide who you
-                  see; the score never overrides them.
-                </p>
-              </details>
+                <button className="outline-button" onClick={onEditAnswers}>
+                  Change a non-negotiable <Icon name="arrow" size={16} />
+                </button>
+              </section>
             )}
 
             <div className="matches-note">
@@ -1384,52 +2170,9 @@ function Matches({
                 </span>
               </p>
             </div>
-            <div className="ai-demo-row">
-              <section className="ai-demo-panel">
-                <h3>
-                  <GenBadge label="neighbourhood guide" />
-                </h3>
-                <p className="ai-demo-lede">
-                  Choose an area by vibe and reputation — in production the intro chat
-                  walks you through this on community sources.
-                </p>
-                {areasToShow.length ? (
-                  areasToShow.map((areaName) => {
-                    const guide = areaGuideFor(areaName)
-                    if (!guide) return null
-                    return (
-                      <div key={areaName} className="area-guide">
-                        <b>{areaName}</b>
-                        <p>{guide.vibe}</p>
-                        <small className="muted">{guide.communityReputation}</small>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <p className="muted">Your target areas will appear here.</p>
-                )}
-              </section>
-              <section className="ai-demo-panel">
-                <h3>
-                  <GenBadge label="listing check" />
-                </h3>
-                <p className="ai-demo-lede">
-                  Before you commit — the red flags a model would catch on any listing or
-                  draft lease.
-                </p>
-                <ul className="safety-list">
-                  {SAFETY_NOTES.map((note) => (
-                    <li key={note.title}>
-                      <b>{note.title}</b>
-                      <span>{note.detail}</span>
-                      {!note.ownerSource && (
-                        <small className="safety-src">Source: {note.source}</small>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
+            {/* The neighbourhood guide and the common-sense list both moved: the
+                guide into the Homes district step (where you choose an area),
+                the cautions into the viewing confirmation (where you commit). */}
           </section>
         </>
       )}
@@ -1441,8 +2184,39 @@ function Matches({
               <p className="section-kicker">Connections</p>
               <h1>Messages</h1>
             </div>
-            {matches.filter((m) => !isBlocked(m)).map((match) => {
+
+            {/* Find a conversation by the home it is about. */}
+            {listingIdsInPlay.length > 0 && (
+              <div className="thread-filters">
+                <button
+                  className={threadFilter === "all" ? "active" : ""}
+                  onClick={() => setThreadFilter("all")}
+                >
+                  All
+                </button>
+                {listingIdsInPlay.map((id) => {
+                  const flat = flats.find((f) => f.id === id)
+                  if (!flat) return null
+                  return (
+                    <button
+                      key={id}
+                      className={threadFilter === id ? "active" : ""}
+                      onClick={() => setThreadFilter(id)}
+                      title={flat.title}
+                    >
+                      {flat.area} · {flat.mapPrice}
+                      {statusOf(id) === "taken" && (
+                        <i className="status-dot taken" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {visibleThreads().map((match) => {
               const last = threads[match.id]?.[threads[match.id].length - 1]
+              const viewing = currentViewing(match.id)
               return (
                 <button
                   key={match.id}
@@ -1451,22 +2225,31 @@ function Matches({
                 >
                   <img src={match.image} alt="" />
                   <span>
-                    <b>{match.name}</b>
+                    <b>
+                      {match.name}
+                      {viewing && (
+                        <i className="red-dot" title={`Viewing: ${viewing.when}`} />
+                      )}
+                    </b>
                     <small>
-                      {last
-                        ? `${last.text.slice(0, 42)}${
-                            last.text.length > 42 ? "…" : ""
-                          }`
-                        : "You're connected — say hello"}
+                      {viewing
+                        ? `Viewing agreed — ${viewing.when}`
+                        : last
+                          ? `${last.text.slice(0, 42)}${
+                              last.text.length > 42 ? "…" : ""
+                            }`
+                          : "You're connected — say hello"}
                     </small>
                   </span>
                   {threads[match.id]?.length ? <i /> : null}
                 </button>
               )
             })}
-            {!loadingMatches && matches.length === 0 && (
+            {!loadingMatches && visibleThreads().length === 0 && (
               <p className="empty-shortlist">
-                No connections yet. React to a starter on the Matches tab.
+                {threadFilter === "all"
+                  ? "No connections yet. React to a starter on the Matches tab."
+                  : "No conversation about this home yet."}
               </p>
             )}
           </aside>
@@ -1476,19 +2259,10 @@ function Matches({
               <span>
                 <b>{chatMatch.name}</b>
                 <small>
-                  <i /> Connected · {scoreLabel(chatMatch.score)} match
+                  <i /> Connected · {fitPhrase(chatMatch.score)}
                 </small>
               </span>
               <span className="chat-actions">
-                <button
-                  className="outline-button"
-                  onClick={() => {
-                    setViewingOpen((open) => !open)
-                    setViewingBooked(null)
-                  }}
-                >
-                  <Icon name="home" size={16} /> Plan a viewing
-                </button>
                 {chatMatch.real && (
                   <>
                     <button
@@ -1504,31 +2278,191 @@ function Matches({
                   </>
                 )}
               </span>
-              <button onClick={() => setTab("flats")}>
-                <Icon name="search" size={16} /> Search flats together
+              <button onClick={() => setTab("homes")}>
+                <Icon name="search" size={16} /> Browse homes
               </button>
             </header>
-            {viewingOpen && (
-              <div className="viewing-panel">
+
+            {/* The nudge: you've just connected, so suggest somewhere. Listing
+                suggestions start the housing half of the conversation. */}
+            {attachedToChat.length === 0 && chatMatch.id && (
+              <div className="suggest-nudge">
+                <Icon name="spark" size={15} />
                 <p>
-                  <b>Book a viewing</b> with {chatMatch.name}{" "}
-                  <GenBadge label="scheduler" />
+                  Suggest somewhere to look — send a home from your saved list
+                  and you'll both be looking at the same thing.
                 </p>
-                <div className="viewing-slots">
-                  {["Sat 10:00", "Sat 14:00", "Sun 11:30", "Weekday 18:00"].map((slot) => (
-                    <button key={slot} className="outline-button" onClick={() => bookViewing(slot)}>
-                      {slot}
-                    </button>
+                <button
+                  className="outline-button"
+                  onClick={() => {
+                    setTab("homes")
+                    setHomesView("saved")
+                  }}
+                >
+                  Pick a home <Icon name="arrow" size={15} />
+                </button>
+              </div>
+            )}
+
+            {/* Homes already in this conversation, with live status. */}
+            {attachedToChat.length > 0 && (
+              <div className="attached-homes">
+                {attachedToChat.map((id) => {
+                  const flat = flats.find((f) => f.id === id)
+                  if (!flat) return null
+                  const status = statusOf(id)
+                  return (
+                    <div key={id} className="attached-home">
+                      <img src={flat.image} alt="" />
+                      <span>
+                        <b>{flat.title}</b>
+                        <small>
+                          {flat.area} · {flat.details} · {flat.priceLabel} whole
+                          flat · about $
+                          {sharePerPerson(flat.price, people).toLocaleString("en-US")}{" "}
+                          each
+                        </small>
+                        <small className={`status-pill ${status}`}>
+                          {STATUS_LABEL[status]}
+                        </small>
+                      </span>
+                      <div className="attached-actions">
+                        <button
+                          className="outline-button"
+                          onClick={() => bookWithAgency(id, chatMatch.id)}
+                        >
+                          {status === "viewing" ? "Booked — chase the agent" : "Book with the agent"}
+                        </button>
+                        <button
+                          className="outline-button"
+                          onClick={() =>
+                            setViewingDraft({
+                              matchId: chatMatch.id,
+                              listingId: id,
+                              when: "",
+                              checked: [],
+                            })
+                          }
+                        >
+                          We're going — lock it in
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* The common-sense check, at the point you commit. */}
+            {viewingDraft && (
+              <div className="viewing-checklist">
+                <p>
+                  <b>Before you go</b> — tick every one.{" "}
+                  <GenBadge label="listing check" />
+                </p>
+                <ul className="safety-list">
+                  {SAFETY_NOTES.map((note) => (
+                    <li key={note.title}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={viewingDraft.checked.includes(note.title)}
+                          onChange={(event) =>
+                            setViewingDraft((draft) =>
+                              draft
+                                ? {
+                                    ...draft,
+                                    checked: event.target.checked
+                                      ? [...draft.checked, note.title]
+                                      : draft.checked.filter(
+                                          (t) => t !== note.title,
+                                        ),
+                                  }
+                                : draft,
+                            )
+                          }
+                        />
+                        <span>
+                          <b>{note.title}</b>
+                          <span>{note.detail}</span>
+                          {!note.ownerSource && (
+                            <small className="safety-src">
+                              Source: {note.source}
+                            </small>
+                          )}
+                        </span>
+                      </label>
+                    </li>
                   ))}
+                </ul>
+                <div className="viewing-when">
+                  <label htmlFor="viewing-when">When are you going?</label>
+                  <input
+                    id="viewing-when"
+                    value={viewingDraft.when}
+                    onChange={(event) =>
+                      setViewingDraft((draft) =>
+                        draft ? { ...draft, when: event.target.value } : draft,
+                      )
+                    }
+                    placeholder="Sat 14:00 — agreed in the chat"
+                  />
                 </div>
-                {viewingBooked && (
-                  <p className="viewing-booked">
-                    Requested {viewingBooked} — they'll get a nudge to confirm.
-                  </p>
-                )}
-                <small>
-                  Prototype: this drops a message into the thread; no calendar integration.
-                </small>
+                <div className="checklist-actions">
+                  <button
+                    className="primary-button"
+                    disabled={
+                      viewingDraft.checked.length < SAFETY_NOTES.length ||
+                      !viewingDraft.when.trim()
+                    }
+                    onClick={confirmViewing}
+                  >
+                    Confirm we've both read this <Icon name="check" size={17} />
+                  </button>
+                  <button
+                    className="outline-button"
+                    onClick={() => setViewingDraft(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* A viewing you have already agreed: when, how to get there, and
+                somewhere nearby to get a feel for the area first. */}
+            {currentViewing(chatMatch.id) && (
+              <div className="viewing-reminder">
+                <span className="red-dot" />
+                <div>
+                  <b>
+                    You're seeing a place with{" "}
+                    {chatMatch.name.split(" ")[0]} —{" "}
+                    {currentViewing(chatMatch.id)?.when}
+                  </b>
+                  {(() => {
+                    const flat = flats.find(
+                      (f) => f.id === currentViewing(chatMatch.id)?.listingId,
+                    )
+                    if (!flat) return null
+                    const guide = areaGuideFor(flat.area)
+                    return (
+                      <>
+                        <small>
+                          <Icon name="home" size={13} /> {flat.title} ·{" "}
+                          {flat.area} ·{" "}
+                          {travelNote(flat.area, campusDistrict) ??
+                            "travel time not estimated"}
+                        </small>
+                        {guide && (
+                          <small className="muted">
+                            Get there early and walk the block — {guide.vibe}
+                          </small>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
               </div>
             )}
             <div className="message-stream">
@@ -1552,19 +2486,15 @@ function Matches({
                       ? chatMatch.hooks[0].text
                       : "You two don't overlap much on paper yet — ask about their week."}
                   </p>
+                  {/* Sends YOUR line only. The old version posted their reply
+                      for them too, which is why the thread looked like a
+                      conversation that had already happened. */}
                   {chatMatch.hooks[0] && (
                     <button
                       className="outline-button"
-                      onClick={() => {
-                        const hook = chatMatch.hooks[0]
-                        setThreads((prev) => ({
-                          ...prev,
-                          [chatMatch.id]: [
-                            { from: "me", text: reactionLabel("wait"), time: "Now" },
-                            { from: "them", text: hook.reply, time: "Now" },
-                          ],
-                        }))
-                      }}
+                      onClick={() =>
+                        pushMessage(`“wait, rlly?!” — ${chatMatch.hooks[0].text}`)
+                      }
                     >
                       <Icon name="send" size={16} /> “wait, rlly?!”
                     </button>
@@ -1593,210 +2523,561 @@ function Matches({
               </form>
             )}
           </div>
+          {/* YOUR saved homes. Not "shared with {person}" — these are yours,
+              they survive every conversation, and sending one into this chat is
+              an explicit action. */}
           <aside className="shared-shortlist">
             <div>
-              <p className="section-kicker">Shared with {chatMatch.name}</p>
-              <h2>Flat shortlist</h2>
-              <p>Save places here so you can compare them together.</p>
+              <p className="section-kicker">Yours, not the chat's</p>
+              <h2>Saved homes ({savedIds.length})</h2>
+              <p>Send one into this conversation when you want to talk about it.</p>
             </div>
             {flats
-              .filter((flat) => shortlist.includes(flat.id))
+              .filter((flat) => savedIds.includes(flat.id))
               .map((flat) => (
-                <button
-                  className="shortlist-item"
-                  key={flat.id}
-                  onClick={() => setTab("flats")}
-                >
+                <div className="shortlist-item saved-home-row" key={flat.id}>
                   <img src={flat.image} alt="" />
                   <span>
                     <b>{flat.area}</b>
-                    <small>{flat.price} / mo</small>
+                    <small>
+                      {flat.priceLabel} · about $
+                      {sharePerPerson(flat.price, people).toLocaleString("en-US")}{" "}
+                      each
+                    </small>
+                    <small className={`status-pill ${statusOf(flat.id)}`}>
+                      {STATUS_LABEL[statusOf(flat.id)]}
+                    </small>
                   </span>
-                </button>
+                  <button
+                    className="send-to-chat"
+                    onClick={() => openSendPicker(flat.id)}
+                    disabled={connections.length === 0}
+                    title={
+                      sentToListing(chatMatch.id, flat.id)
+                        ? `Already sent to ${chatMatch.name.split(" ")[0]}`
+                        : "Send this home into a conversation"
+                    }
+                  >
+                    <Icon
+                      name={sentToListing(chatMatch.id, flat.id) ? "check" : "send"}
+                      size={15}
+                    />
+                  </button>
+                </div>
               ))}
-            {shortlist.length === 0 && (
-              <p className="empty-shortlist">No flats saved together yet.</p>
+            {savedIds.length === 0 && (
+              <p className="empty-shortlist">
+                Nothing saved yet — save homes from the Homes tab.
+              </p>
             )}
-            <button className="outline-button" onClick={() => setTab("flats")}>
-              <Icon name="search" size={16} /> Browse flats
+            <button className="outline-button" onClick={() => setTab("homes")}>
+              <Icon name="search" size={16} /> Browse homes
             </button>
           </aside>
         </section>
       )}
 
-      {tab === "flats" && (
+      {tab === "homes" && (
         <section className="flats-browser">
           <div className="flats-search-header">
             <div>
-              <p className="section-kicker">25 verified student homes</p>
-              <h1>Find your space in Hong Kong.</h1>
+              <p className="section-kicker">
+                {homesView === "saved" ? "Your saved homes" : "Homes in Hong Kong"}
+              </p>
+              <h1>{homesView === "saved" ? "Your shortlist." : "Find your space."}</h1>
             </div>
-            <div className="search-box">
-              <Icon name="search" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search neighbourhood or flat"
-              />
-            </div>
-            <div className="map-filters">
-              <button>2 bedrooms</button>
-              <button>Under $20K</button>
-              <button>Near MTR</button>
-              <button>3D tour</button>
-            </div>
-            <div className="mobile-map-switch">
+            <div className="homes-view-switch">
               <button
-                className={!mobileMap ? "active" : ""}
-                onClick={() => setMobileMap(false)}
+                className={homesView === "browse" ? "active" : ""}
+                onClick={() => {
+                  setHomesView("browse")
+                  setBrowseStep("districts")
+                  setSelectedArea(null)
+                }}
               >
-                List
+                Browse
               </button>
               <button
-                className={mobileMap ? "active" : ""}
-                onClick={() => setMobileMap(true)}
+                className={homesView === "saved" ? "active" : ""}
+                onClick={() => setHomesView("saved")}
               >
-                Map
+                Saved ({savedIds.length})
               </button>
             </div>
+            {budgetCeiling !== null && (
+              <p className="household-note">
+                Household budget <b>${budgetCeiling.toLocaleString("en-US")}</b> for
+                the whole flat — ${(profile?.budget_max ?? 0).toLocaleString("en-US")}{" "}
+                each × {people} people. Every home here is priced against that, not
+                against the whole market.
+              </p>
+            )}
           </div>
 
-          <div className={`map-explorer ${mobileMap ? "show-map" : ""}`}>
-            <aside className="map-results">
-              <div className="result-count">
-                <b>{visibleFlats.length} places</b>
-                <span>Best match ↓</span>
-              </div>
-              <div className="result-scroll">
-                {visibleFlats.map((flat) => (
-                  <button
-                    key={flat.id}
-                    className={selectedFlat.id === flat.id ? "active" : ""}
-                    onClick={() => setSelectedFlat(flat)}
-                  >
-                    <img src={flat.image} alt="" />
-                    <span>
-                      <small>{flat.area}</small>
-                      <b>{flat.title}</b>
-                      <i>{flat.details}</i>
-                      <strong>
-                        {flat.price} <em>/ mo</em>
-                      </strong>
-                    </span>
-                    <span className="tour-badge">3D</span>
-                  </button>
-                ))}
-              </div>
-            </aside>
+          {homesView === "saved" && (
+            <div className="saved-homes-grid">
+              {flats
+                .filter((flat) => savedIds.includes(flat.id))
+                .map((flat) => {
+                  const status = statusOf(flat.id)
+                  // The agency's side of the booking. This is where a booking
+                  // that no longer exists shows up — see lib/agentUpdates.ts.
+                  const thread = agentThread(
+                    flat.id,
+                    status,
+                    personal.viewings.find((v) => v.listingId === flat.id)?.when,
+                  )
+                  const cancelled = thread.some((update) => update.cancels)
+                  return (
+                    <article className="saved-home-card" key={flat.id}>
+                      <img src={flat.image} alt="" />
+                      <div>
+                        <span className="detail-area">{flat.area}</span>
+                        <h2>{flat.title}</h2>
+                        <p>{flat.details}</p>
+                        <p className="saved-price">
+                          <b>{flat.priceLabel}</b> whole flat ·{" "}
+                          <em>
+                            about $
+                            {sharePerPerson(flat.price, people).toLocaleString(
+                              "en-US",
+                            )}{" "}
+                            each
+                          </em>
+                        </p>
+                        <textarea
+                          className="saved-note-input"
+                          rows={2}
+                          placeholder="Your own note — what you noticed, what to ask."
+                          value={personal.notes[String(flat.id)] ?? ""}
+                          onChange={(event) =>
+                            patchPersonal((state) => ({
+                              ...state,
+                              notes: {
+                                ...state.notes,
+                                [String(flat.id)]: event.target.value,
+                              },
+                            }))
+                          }
+                        />
 
-            <article className="map-property-detail">
-              <div className="detail-image">
-                <img src={selectedFlat.image} alt={selectedFlat.title} />
-                <span>Verified listing</span>
-                <button
-                  onClick={() => toggleShortlist(selectedFlat.id)}
-                  className={shortlist.includes(selectedFlat.id) ? "saved" : ""}
-                >
-                  <Icon name="heart" size={17} />
-                </button>
-              </div>
-              <div className="detail-copy">
-                <span className="detail-area">{selectedFlat.area}</span>
-                <h2>{selectedFlat.title}</h2>
-                <div className="detail-rating">
-                  <b>{selectedFlat.rating} ★</b>
-                  <span>Verified for students</span>
-                </div>
-                <p>{selectedFlat.details}</p>
-                <p>{selectedFlat.commute} · MTR and daily shops nearby</p>
-                <div className="detail-price">
-                  <b>{selectedFlat.price}</b>
-                  <span>/ month</span>
-                </div>
-                <p className="detail-note">
-                  {flatContext
-                    ? `${flatContext.label} · no agency fee on RentMate`
-                    : "District average: not provided."}
+                        {/* THE AGENT PANEL. In production this is the agency's
+                            real inbox; here it is pre-written and badged, like
+                            every other piece of mock content. */}
+                        <div className="agent-panel">
+                          <p className="agent-head">
+                            <GenBadge label="agent" />
+                            <b>{agentFor(flat.id)}</b>
+                            <span className={`status-pill ${status}`}>
+                              {STATUS_LABEL[status]}
+                            </span>
+                          </p>
+                          <ul>
+                            {thread.map((update) => (
+                              <li
+                                key={update.text}
+                                className={update.cancels ? "agent-cancel" : undefined}
+                              >
+                                <p>{update.text}</p>
+                                <small>{update.time}</small>
+                              </li>
+                            ))}
+                          </ul>
+                          {cancelled && (
+                            <p className="agent-cancel-note">
+                              <Icon name="lock" size={13} /> That booking no longer
+                              exists. Nothing else is affected — your notes and
+                              the person you were going with are still here.
+                            </p>
+                          )}
+                        </div>
+
+                        {sentFlash?.listingId === flat.id && (
+                          <p className="sent-flash">
+                            <Icon name="check" size={13} /> Sent to{" "}
+                            {sentFlash.name} — open Messages to carry on there.
+                          </p>
+                        )}
+
+                        <div className="saved-home-actions">
+                          <button
+                            className="outline-button"
+                            onClick={() => bookWithAgency(flat.id)}
+                            disabled={status === "taken"}
+                          >
+                            <Icon name="home" size={15} />{" "}
+                            {status === "viewing"
+                              ? "Booked — chase the agent"
+                              : status === "taken"
+                                ? "No longer available"
+                                : "Book a viewing with the agent"}
+                          </button>
+                          <button
+                            className="outline-button"
+                            onClick={() => openSendPicker(flat.id)}
+                            disabled={connections.length === 0}
+                          >
+                            <Icon name="send" size={15} /> Send to chat
+                          </button>
+                          <button
+                            className="outline-button"
+                            onClick={() => toggleSaved(flat.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              {savedIds.length === 0 && (
+                <p className="empty-shortlist">
+                  Nothing saved yet. Save a home and it stays here — yours, not tied
+                  to any conversation.
                 </p>
+              )}
+            </div>
+          )}
+
+          {homesView === "browse" && browseStep === "districts" && (
+            <div className="district-step">
+              <p className="step-lede">
+                Start with how long you're willing to travel. Pick an area and we'll
+                show the homes in it, with what to look for.
+              </p>
+              <div className="district-grid">
+                {(targetAreas.length ? targetAreas : LISTING_DISTRICTS).map((area) => {
+                  const guide = areaGuideFor(area)
+                  const count = homesInArea(area).length
+                  const minutes = campusDistrict
+                    ? commuteMinutes(area, campusDistrict)
+                    : null
+                  const overLimit =
+                    minutes !== null && commuteLimit !== null && minutes > commuteLimit
+                  return (
+                    <button
+                      key={area}
+                      className={`district-card ${overLimit ? "over-limit" : ""}`}
+                      onClick={() => {
+                        setSelectedArea(area)
+                        setBrowseStep("listings")
+                      }}
+                    >
+                      <b>{area}</b>
+                      <span className="district-travel">
+                        {travelNote(area, campusDistrict) ?? "—"}
+                        {overLimit ? ` · over your ${commuteLimit} min limit` : ""}
+                      </span>
+                      <span className="district-count">
+                        {count} home{count === 1 ? "" : "s"} within your household
+                        budget
+                      </span>
+                      {guide && (
+                        <span className="district-guide">
+                          <GenBadge label="neighbourhood guide" />
+                          <em>{guide.vibe}</em>
+                          <small className="muted">{guide.communityReputation}</small>
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {homesView === "browse" && browseStep === "listings" && (
+            <>
+              <div className="flats-filters">
                 <button
-                  className="tour-button"
+                  className="back-button"
                   onClick={() => {
-                    setTourFlat(selectedFlat)
-                    setTourAngle(180)
-                    setTourRoom(0)
-                    setTourMode("3d")
+                    setBrowseStep("districts")
+                    setSelectedArea(null)
                   }}
                 >
-                  <span className="cube-icon">3D</span>
-                  <span>
-                    <b>Explore the actual space</b>
-                    <small>Interactive room view + dimensions</small>
-                  </span>
-                  <Icon name="arrow" size={18} />
+                  <Icon name="back" size={15} /> All areas
                 </button>
-                <button
-                  className={`share-flat-button ${
-                    shortlist.includes(selectedFlat.id) ? "saved" : ""
-                  }`}
-                  onClick={() => toggleShortlist(selectedFlat.id)}
-                >
-                  {shortlist.includes(selectedFlat.id) ? (
-                    <>
-                      <Icon name="check" size={16} /> Shared with{" "}
-                      {chatMatch.name.split(" ")[0]}
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="heart" size={16} /> Save with{" "}
-                      {chatMatch.name.split(" ")[0]}
-                    </>
-                  )}
-                </button>
+                <span className="filter-area-tag">{selectedArea ?? "All areas"}</span>
+                <div className="map-filters">
+                  <button
+                    className={withinBudget ? "active" : ""}
+                    onClick={() => setWithinBudget((v) => !v)}
+                  >
+                    Within my household budget
+                  </button>
+                  <button
+                    className={withinTravelLimit ? "active" : ""}
+                    onClick={() => setWithinTravelLimit((v) => !v)}
+                  >
+                    Within my travel limit
+                  </button>
+                  <button
+                    className={nearMtrOnly ? "active" : ""}
+                    onClick={() => setNearMtrOnly((v) => !v)}
+                  >
+                    Near MTR
+                  </button>
+                  <button
+                    className={mustHavesOnly ? "active" : ""}
+                    onClick={() => setMustHavesOnly((v) => !v)}
+                  >
+                    My must-haves
+                  </button>
+                  <select
+                    value={bedroomFilter}
+                    onChange={(event) =>
+                      setBedroomFilter(Number(event.target.value) as 0 | 1 | 2 | 3)
+                    }
+                    aria-label="Bedrooms"
+                  >
+                    <option value={0}>Any bedrooms</option>
+                    <option value={1}>1 bedroom</option>
+                    <option value={2}>2 bedrooms</option>
+                    <option value={3}>3 bedrooms</option>
+                  </select>
+                </div>
+                <div className="search-box">
+                  <Icon name="search" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search neighbourhood or flat"
+                  />
+                </div>
+                <div className="mobile-map-switch">
+                  <button
+                    className={!mobileMap ? "active" : ""}
+                    onClick={() => setMobileMap(false)}
+                  >
+                    List
+                  </button>
+                  <button
+                    className={mobileMap ? "active" : ""}
+                    onClick={() => setMobileMap(true)}
+                  >
+                    Map
+                  </button>
+                </div>
               </div>
-            </article>
 
-            <div className="rental-map">
-              <div className="map-water">
-                <span>Victoria Harbour</span>
-              </div>
-              <div className="map-road road-one" />
-              <div className="map-road road-two" />
-              <div className="map-road road-three" />
-              <div className="map-road road-four" />
-              <span className="map-label label-one">Kowloon</span>
-              <span className="map-label label-two">Hong Kong Island</span>
-              <span className="map-label label-three">New Territories</span>
-              {visibleFlats.map((flat) => (
-                <button
-                  key={flat.id}
-                  style={{ left: `${flat.x}%`, top: `${flat.y}%` }}
-                  className={`map-pin ${
-                    selectedFlat.id === flat.id ? "active" : ""
-                  }`}
-                  onClick={() => setSelectedFlat(flat)}
-                  aria-label={`View ${flat.title} at ${flat.price}`}
-                >
-                  {flat.mapPrice}
-                </button>
-              ))}
-              <button className="search-map-area">
-                <Icon name="search" size={14} /> Search this area
-              </button>
-              <div className="map-zoom">
-                <button>+</button>
-                <button>−</button>
-              </div>
-            </div>
-          </div>
+              <div className={`map-explorer ${mobileMap ? "show-map" : ""}`}>
+                <aside className="map-results">
+                  <div className="result-count">
+                    <b>{visibleFlats.length} places</b>
+                    <span>Within your filters</span>
+                  </div>
+                  <div className="result-scroll">
+                    {visibleFlats.map((flat) => {
+                      const warning = flatSizeWarningForHome(profile ?? {}, flat.sqft)
+                      const status = statusOf(flat.id)
+                      const sent = connections.some((person) =>
+                        sentToListing(person.id, flat.id),
+                      )
+                      return (
+                        <div
+                          className={`result-row ${
+                            selectedFlat.id === flat.id ? "active" : ""
+                          }`}
+                          key={flat.id}
+                        >
+                          {/* The AI listing notes used to be printed under every
+                              row here. They belong on the detail panel, where
+                              you have actually stopped to read about one flat —
+                              not on the list you are scanning. */}
+                          <button
+                            className="result-open"
+                            onClick={() => setSelectedFlatId(flat.id)}
+                          >
+                            <img src={flat.image} alt="" />
+                            <span className="result-copy">
+                              <small className="result-area">{flat.area}</small>
+                              <b>{flat.title}</b>
+                              <i>{flat.details}</i>
+                              <strong>
+                                {flat.priceLabel} <em>/ mo whole flat</em>
+                              </strong>
+                              <em className="share-line">
+                                about $
+                                {sharePerPerson(flat.price, people).toLocaleString(
+                                  "en-US",
+                                )}{" "}
+                                each for {people}
+                              </em>
+                            </span>
+                          </button>
+                          <div className="result-foot">
+                            <span className={`status-pill ${status}`}>
+                              {STATUS_LABEL[status]}
+                            </span>
+                            {flat.nearMtr && <span className="chip-mini">Near MTR</span>}
+                            <span className="chip-mini">3D walkthrough</span>
+                            {sent && (
+                              <span className="chip-mini chip-sent">
+                                <Icon name="check" size={11} /> Sent
+                              </span>
+                            )}
+                            <div className="result-actions">
+                              <button
+                                className={`save-mini ${
+                                  savedIds.includes(flat.id) ? "saved" : ""
+                                }`}
+                                onClick={() => toggleSaved(flat.id)}
+                                aria-label="Save this home"
+                              >
+                                <Icon name="heart" size={15} />
+                              </button>
+                              <button
+                                className="send-mini"
+                                onClick={() => openSendPicker(flat.id)}
+                                disabled={connections.length === 0}
+                                title="Send this home into a conversation"
+                              >
+                                <Icon name="send" size={15} />
+                              </button>
+                            </div>
+                          </div>
+                          {warning && <small className="out-of-range">{warning}</small>}
+                        </div>
+                      )
+                    })}
+                    {visibleFlats.length === 0 && (
+                      <p className="empty-shortlist">
+                        Nothing matches those filters. Try widening the travel limit
+                        or the household budget.
+                      </p>
+                    )}
+                  </div>
+                </aside>
 
-          <button className="floating-chat" onClick={() => setTab("messages")}>
-            <img src={chatMatch.image} alt="" />
-            <span>
-              <b>Planning with {chatMatch.name.split(" ")[0]}</b>
-              <small>{shortlist.length} flats shortlisted together</small>
-            </span>
-            <Icon name="chat" />
-          </button>
+                <article className="map-property-detail">
+                  <div className="detail-image">
+                    <img src={selectedFlat.image} alt={selectedFlat.title} />
+                    <span>{selectedFlat.nearMtr ? "Near MTR" : "Synthetic listing"}</span>
+                    <button
+                      onClick={() => toggleSaved(selectedFlat.id)}
+                      className={savedIds.includes(selectedFlat.id) ? "saved" : ""}
+                      aria-label="Save this home"
+                    >
+                      <Icon name="heart" size={17} />
+                    </button>
+                  </div>
+                  <div className="detail-copy">
+                    <span className="detail-area">{selectedFlat.area}</span>
+                    <h2>{selectedFlat.title}</h2>
+                    <div className="detail-rating">
+                      <b>{selectedFlat.rating} ★</b>
+                      <span>{selectedFlat.details}</span>
+                    </div>
+                    <p>{travelNote(selectedFlat.area, campusDistrict) ?? "—"}</p>
+                    <div className="detail-price">
+                      <b>{selectedFlat.priceLabel}</b>
+                      <span>/ month, whole flat</span>
+                    </div>
+                    <p className="detail-share">
+                      About{" "}
+                      <b>
+                        $
+                        {sharePerPerson(selectedFlat.price, people).toLocaleString(
+                          "en-US",
+                        )}
+                      </b>{" "}
+                      each for {people} people
+                    </p>
+                    <p className="detail-note">
+                      {flatContext
+                        ? `${flatContext.label} · no agency fee on RentMate`
+                        : "District average: not provided."}
+                    </p>
+                    <div className="detail-tips">
+                      <GenBadge label="listing notes" />
+                      <ul>
+                        {selectedFlat.tips.map((tip) => (
+                          <li key={tip}>{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    {/* Status is no longer something you declare from a
+                        dropdown — it is what the agency told you. So it reads
+                        as a status, and the only control is the booking. */}
+                    <div className="status-row">
+                      <span className={`status-pill ${statusOf(selectedFlat.id)}`}>
+                        {STATUS_LABEL[statusOf(selectedFlat.id)]}
+                      </span>
+                      <small className="status-source">
+                        set by {agentFor(selectedFlat.id)}
+                      </small>
+                    </div>
+                    {flatSizeWarningForHome(profile ?? {}, selectedFlat.sqft) && (
+                      <p className="out-of-range">
+                        {flatSizeWarningForHome(profile ?? {}, selectedFlat.sqft)}
+                      </p>
+                    )}
+                    <button
+                      className="tour-button"
+                      onClick={() => {
+                        setTourFlatId(selectedFlat.id)
+                        setTourAngle(180)
+                        setTourRoom(0)
+                      }}
+                    >
+                      <span className="cube-icon">3D</span>
+                      <span>
+                        <b>Walk through this home</b>
+                        <small>
+                          {selectedFlat.rooms.length} rooms · {selectedFlat.sqft} sq ft
+                        </small>
+                      </span>
+                      <Icon name="arrow" size={18} />
+                    </button>
+                    <button
+                      className="outline-button"
+                      onClick={() => bookWithAgency(selectedFlat.id)}
+                      disabled={statusOf(selectedFlat.id) === "taken"}
+                    >
+                      <Icon name="home" size={16} />{" "}
+                      {statusOf(selectedFlat.id) === "viewing"
+                        ? "Booked — chase the agent"
+                        : statusOf(selectedFlat.id) === "taken"
+                          ? "No longer available"
+                          : "Book a viewing with the agent"}
+                    </button>
+                    <button
+                      className={`share-flat-button ${
+                        savedIds.includes(selectedFlat.id) ? "saved" : ""
+                      }`}
+                      onClick={() => toggleSaved(selectedFlat.id)}
+                    >
+                      {savedIds.includes(selectedFlat.id) ? (
+                        <>
+                          <Icon name="check" size={16} /> Saved to your list
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="heart" size={16} /> Save to my list
+                        </>
+                      )}
+                    </button>
+                    <button
+                      className="outline-button"
+                      onClick={() => openSendPicker(selectedFlat.id)}
+                      disabled={connections.length === 0}
+                    >
+                      <Icon name="send" size={16} /> Send to chat
+                    </button>
+                  </div>
+                </article>
+
+                <HkMap
+                  listings={visibleFlats}
+                  selectedId={selectedFlat.id}
+                  statusOf={statusOf}
+                  onSelect={setSelectedFlatId}
+                  visible={mobileMap}
+                />
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -1818,11 +3099,11 @@ function Matches({
           <span>Messages</span>
         </button>
         <button
-          className={tab === "flats" ? "active" : ""}
-          onClick={() => setTab("flats")}
+          className={tab === "homes" ? "active" : ""}
+          onClick={() => setTab("homes")}
         >
           <Icon name="home" size={19} />
-          <span>Flats</span>
+          <span>Homes</span>
         </button>
       </nav>
 
@@ -1848,8 +3129,8 @@ function Matches({
                 <p>{activeMatch.school}</p>
               </div>
               <div className="modal-score">
-                <b>{scoreLabel(activeMatch.score)}</b>
-                <span>lifestyle match</span>
+                <b>{fitPhrase(activeMatch.score)}</b>
+                <span>how your habits line up</span>
               </div>
             </div>
             <div className="compatibility-box">
@@ -1939,38 +3220,42 @@ function Matches({
                   </small>
                 </span>
               </div>
-              <div className="tour-mode-tabs">
-                <button
-                  className={tourMode === "3d" ? "active" : ""}
-                  onClick={() => {
-                    stopAr()
-                    setTourMode("3d")
-                  }}
-                >
-                  3D walkthrough
-                </button>
-                <button
-                  className={tourMode === "ar" ? "active" : ""}
-                  onClick={() => setTourMode("ar")}
-                >
-                  AR room check
-                </button>
-              </div>
-              <button onClick={closeTour} aria-label="Close spatial view">
+              <button onClick={closeTour} aria-label="Close walkthrough">
                 ×
               </button>
             </header>
+            {/*
+              Demo honesty. The owner's review: "the 3d walk through is also the
+              same for every listing — fix it, or make it clear its only a demo."
+              Both halves are now done: `roomsFor()` in lib/listings.ts derives a
+              room set from the flat's own square footage and bedroom count, so a
+              400 sq ft studio and a 1000 sq ft three-bed do not share a walkthrough,
+              and the mock badge below says out loud that none of it is a real scan.
+            */}
+            <p className="tour-demo-banner">
+              <Icon name="spark" size={14} /> Illustrative walkthrough — a
+              stand-in for a per-listing scan, generated from this flat's floor
+              area. Not a photograph of the actual unit.
+            </p>
             <div className="tour-content">
               <div className="spatial-view">
-                {tourMode === "3d" ? (
+                {tourRooms.length === 0 ? (
+                  <div className="tour-empty">
+                    <h2>No walkthrough for this one yet.</h2>
+                    <p>
+                      This listing has not been scanned. Ask the agent for a
+                      video viewing.
+                    </p>
+                  </div>
+                ) : (
                   <>
                     <div
                       className="panorama"
                       role="application"
                       tabIndex={0}
-                      aria-label={`360 degree view of ${roomViews[tourRoom].name}. Drag or use arrow keys to look around.`}
+                      aria-label={`360 degree view of ${tourRooms[tourRoom].name}. Drag or use arrow keys to look around.`}
                       style={{
-                        backgroundImage: `linear-gradient(90deg, rgba(21,28,24,.18), transparent 40%, rgba(21,28,24,.18)), url(${roomViews[tourRoom].image})`,
+                        backgroundImage: `linear-gradient(90deg, rgba(21,28,24,.18), transparent 40%, rgba(21,28,24,.18)), url(${tourRooms[tourRoom].image})`,
                         backgroundPosition: `${(tourAngle / 360) * 100}% center`,
                       }}
                       onPointerDown={(event) => {
@@ -2007,8 +3292,8 @@ function Matches({
                       }}
                     >
                       <span className="room-label living-label">
-                        <b>{roomViews[tourRoom].name}</b>
-                        <small>{roomViews[tourRoom].dimensions}</small>
+                        <b>{tourRooms[tourRoom].name}</b>
+                        <small>{tourRooms[tourRoom].dimensions}</small>
                         <small className="tour-mock-note">
                           Illustrative mock · not a real 3D scan
                         </small>
@@ -2021,7 +3306,7 @@ function Matches({
                         <button
                           className="street-forward"
                           onClick={() => moveRoom(1)}
-                          aria-label={`Move forward to ${roomViews[(tourRoom + 1) % roomViews.length].name}`}
+                          aria-label={`Move forward to ${tourRooms[(tourRoom + 1) % tourRooms.length].name}`}
                         >
                           ↑
                         </button>
@@ -2042,14 +3327,14 @@ function Matches({
                         <button
                           className="street-back"
                           onClick={() => moveRoom(-1)}
-                          aria-label={`Move back to ${roomViews[(tourRoom - 1 + roomViews.length) % roomViews.length].name}`}
+                          aria-label={`Move back to ${tourRooms[(tourRoom - 1 + tourRooms.length) % tourRooms.length].name}`}
                         >
                           ↓
                         </button>
                         <span>
                           Move through
                           <b>
-                            {roomViews[(tourRoom + 1) % roomViews.length].name}
+                            {tourRooms[(tourRoom + 1) % tourRooms.length].name}
                           </b>
                         </span>
                       </div>
@@ -2088,10 +3373,10 @@ function Matches({
                       onChange={(event) =>
                         setTourAngle(Number(event.target.value))
                       }
-                      aria-label="Rotate spatial view"
+                      aria-label="Rotate walkthrough"
                     />
                     <div className="room-navigation">
-                      {roomViews.map((room, index) => (
+                      {tourRooms.map((room, index) => (
                         <button
                           key={room.name}
                           className={tourRoom === index ? "active" : ""}
@@ -2107,157 +3392,131 @@ function Matches({
                       ))}
                     </div>
                   </>
-                ) : (
-                  <div className="ar-experience">
-                    <div className="ar-stage">
-                      <video ref={arVideoRef} autoPlay muted playsInline />
-                      {!arActive && (
-                        <div className="ar-start-panel">
-                          <span className="ar-mark">AR</span>
-                          <h2>Check furniture fit in your room.</h2>
-                          <p>
-                            Use your camera to place a true-scale outline before
-                            you commit to the flat.
-                          </p>
-                          <button onClick={startAr}>Start camera AR</button>
-                          {arError && <small>{arError}</small>}
-                        </div>
-                      )}
-                      {arActive && (
-                        <>
-                          <div className="ar-grid" />
-                          <div className={`ar-object ${placedItem || "empty"}`}>
-                            {placedItem ? (
-                              <>
-                                <b>{placedItem}</b>
-                                <span>
-                                  {placedItem === "bed"
-                                    ? "1.9 × 1.35 m"
-                                    : placedItem === "desk"
-                                      ? "1.2 × 0.6 m"
-                                      : "1.8 × 0.85 m"}
-                                </span>
-                              </>
-                            ) : (
-                              <span>Choose furniture to place</span>
-                            )}
-                          </div>
-                          <div className="ar-instruction">
-                            Move your phone slowly to check walking clearance
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <div className="ar-toolbar">
-                      <span>Place at scale</span>
-                      {(["bed", "desk", "sofa"] as const).map((item) => (
-                        <button
-                          key={item}
-                          className={placedItem === item ? "active" : ""}
-                          onClick={() => setPlacedItem(item)}
-                          disabled={!arActive}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => setPlacedItem(null)}
-                        disabled={!arActive}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
                 )}
               </div>
               <aside className="floor-plan-panel">
-                <p className="section-kicker">
-                  {tourMode === "3d" ? "Measured floor plan" : "AR scale guide"}
-                </p>
-                <h2>
-                  {tourMode === "3d"
-                    ? "Move through every room."
-                    : "Confirm what really fits."}
-                </h2>
+                <p className="section-kicker">Measured floor plan</p>
+                <h2>Move through every room.</h2>
                 <p>
-                  {tourMode === "3d"
-                    ? "Select a room or follow the floor marker. Dimensions stay visible while you explore."
-                    : "Camera AR overlays common furniture footprints so you can check scale and walking space."}
+                  Rooms and dimensions are derived from this flat&apos;s own
+                  floor area, so the walkthrough changes between listings.
+                  Dimensions stay visible while you explore.
                 </p>
                 <div className="mini-floor-plan interactive-plan">
-                  <button
-                    className={`plan-living ${tourRoom === 0 ? "active" : ""}`}
-                    onClick={() => {
-                      setTourMode("3d")
-                      setTourRoom(0)
-                    }}
-                  >
-                    <b>Living</b>
-                    <small>15.1 m²</small>
-                  </button>
-                  <button
-                    className={`plan-bed-one ${tourRoom === 1 ? "active" : ""}`}
-                    onClick={() => {
-                      setTourMode("3d")
-                      setTourRoom(1)
-                    }}
-                  >
-                    <b>Bed 1</b>
-                    <small>8.6 m²</small>
-                  </button>
-                  <button
-                    className={`plan-bed-two ${tourRoom === 2 ? "active" : ""}`}
-                    onClick={() => {
-                      setTourMode("3d")
-                      setTourRoom(2)
-                    }}
-                  >
-                    <b>Bed 2</b>
-                    <small>7.9 m²</small>
-                  </button>
-                  <button
-                    className={`plan-kitchen ${tourRoom === 3 ? "active" : ""}`}
-                    onClick={() => {
-                      setTourMode("3d")
-                      setTourRoom(3)
-                    }}
-                  >
-                    <b>Kitchen</b>
-                    <small>5.2 m²</small>
-                  </button>
-                  <div className="plan-bath">
-                    <b>Bath</b>
-                    <small>3.4 m²</small>
-                  </div>
+                  {tourRooms.map((room, index) => (
+                    <button
+                      key={`plan-${room.name}`}
+                      className={tourRoom === index ? "active" : ""}
+                      onClick={() => {
+                        setTourRoom(index)
+                        setTourAngle(180)
+                      }}
+                    >
+                      <b>{room.name}</b>
+                      <small>{room.areaSqm} m²</small>
+                    </button>
+                  ))}
                 </div>
                 <div className="space-summary">
                   <span>
-                    <small>Usable area</small>
-                    <b>{tourFlat.details.split("·")[2]?.trim()}</b>
+                    <small>Whole flat</small>
+                    <b>{tourFlat.sqft} sq ft</b>
                   </span>
                   <span>
-                    <small>Ceiling height</small>
-                    <b>2.55 m</b>
+                    <small>Your share</small>
+                    <b>
+                      ${sharePerPerson(tourFlat.price, people).toLocaleString(
+                        "en-US",
+                      )}
+                      /mo
+                    </b>
                   </span>
                 </div>
                 <button
                   className={`share-flat-button ${
-                    shortlist.includes(tourFlat.id) ? "saved" : ""
+                    savedIds.includes(tourFlat.id) ? "saved" : ""
                   }`}
-                  onClick={() => toggleShortlist(tourFlat.id)}
+                  onClick={() => toggleSaved(tourFlat.id)}
                 >
-                  {shortlist.includes(tourFlat.id) ? (
+                  {savedIds.includes(tourFlat.id) ? (
                     <>
-                      <Icon name="check" size={16} /> In shared shortlist
+                      <Icon name="check" size={16} /> Saved to your homes
                     </>
                   ) : (
                     <>
-                      <Icon name="heart" size={16} /> Save this flat together
+                      <Icon name="heart" size={16} /> Save this home for me
                     </>
                   )}
                 </button>
               </aside>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* WHICH CONVERSATION? "Send to chat" used to silently target whichever
+          thread happened to be open, so from the Homes tab it could post a flat
+          into a conversation you were not even looking at. It asks now. */}
+      {sendPickerFor !== null && (
+        <div className="modal-backdrop" onClick={() => setSendPickerFor(null)}>
+          <div
+            className="send-picker"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-label="Choose a conversation"
+          >
+            <header>
+              <p className="section-kicker">Send to a conversation</p>
+              <h2>
+                {flats.find((flat) => flat.id === sendPickerFor)?.title ??
+                  "This home"}
+              </h2>
+              <p>
+                It goes in as a normal message, so you can argue about the price
+                in words.
+              </p>
+            </header>
+            {connections.length === 0 ? (
+              <p className="empty-shortlist">
+                You have no conversations yet — say hi to someone on the Matches
+                tab first.
+              </p>
+            ) : (
+              <ul>
+                {connections.map((person) => {
+                  const already = sentToListing(person.id, sendPickerFor)
+                  return (
+                    <li key={person.id}>
+                      <button
+                        onClick={() => sendListingTo(person.id, sendPickerFor)}
+                        disabled={already}
+                      >
+                        <img src={person.image} alt="" />
+                        <span>
+                          <b>{person.name}</b>
+                          <small>
+                            {person.school} · {fitPhrase(person.score)}
+                          </small>
+                        </span>
+                        {already ? (
+                          <i className="send-already">
+                            <Icon name="check" size={13} /> Sent
+                          </i>
+                        ) : (
+                          <Icon name="send" size={16} />
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <button
+              className="outline-button"
+              onClick={() => setSendPickerFor(null)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -2272,11 +3531,24 @@ export default function App() {
     INSTITUTIONS.find((i) => i.domains.includes("cuhk.edu.hk")) ?? null,
   )
   const [profile, setProfile] = useState<Profile | null>(null)
+  // Where the last profile save landed. Passed to the account menu so "is this
+  // actually on the server?" is answerable from inside the app.
+  const [profileSync, setProfileSync] = useState<ProfileSync | null>(null)
+  // Kept so "Edit my answers" reopens the quiz with your current picks still
+  // ticked instead of making you retype all twenty-odd of them. Rebuilt from
+  // the saved profile when you come back on a new session (answersFromProfile).
+  const [answers, setAnswers] = useState<Answer[]>(() =>
+    Array(QUIZ.length).fill(undefined),
+  )
+  // Set when a sign-in restored an existing account rather than starting a new
+  // one, so the workspace can say so once.
+  const [restored, setRestored] = useState(false)
 
   // Mount reload: restore the account keyed on the last email this browser
   // used. NO SESSIONS — no token, no cookie, no Auth. If the row is there the
   // user lands straight in the workspace instead of re-taking the quiz; if it
-  // is not (a first visit, or a cleared browser) they start at Home as before.
+  // is not (a first visit, OR a deliberate log-out — see logOut below) they
+  // start at Home as before.
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -2291,6 +3563,8 @@ export default function App() {
             : null,
         )
         setProfile(loaded.profile)
+        setAnswers(answersFromProfile(loaded.profile))
+        setProfileSync(loaded.source === "supabase" ? "server" : "device")
         setScreen("matches")
       } else {
         setScreen("home")
@@ -2300,6 +3574,24 @@ export default function App() {
       cancelled = true
     }
   }, [])
+
+  /**
+   * LOG OUT.
+   *
+   * This used to only move the screen back to Home, which left the remembered
+   * email in place — so the next mount walked straight back into the account
+   * and "log out" did nothing at all. `forgetAccount()` is what actually ends
+   * the session on a build with no sessions. Your profile row and your saved
+   * homes are untouched: typing the same email brings them all back.
+   */
+  function logOut() {
+    forgetAccount()
+    setProfile(null)
+    setProfileSync(null)
+    setRestored(false)
+    setAnswers(Array(QUIZ.length).fill(undefined))
+    setScreen("home")
+  }
 
   if (screen === null)
     return (
@@ -2312,23 +3604,40 @@ export default function App() {
     return (
       <Verify
         onBack={() => setScreen("home")}
-        onVerified={(value, inst) => {
+        onVerified={(value, inst, existing) => {
           setEmail(value)
           setInstitution(inst)
-          setScreen("quiz")
+          if (existing) {
+            // Welcome back — do not make them answer everything again.
+            setProfile(existing.profile)
+            setAnswers(answersFromProfile(existing.profile))
+            setProfileSync(existing.source === "supabase" ? "server" : "device")
+            setRestored(true)
+            setScreen("matches")
+          } else {
+            setProfile(null)
+            setAnswers(Array(QUIZ.length).fill(undefined))
+            setProfileSync(null)
+            setRestored(false)
+            setScreen("quiz")
+          }
         }}
       />
     )
   if (screen === "quiz")
     return (
       <Quiz
-        onBack={() => setScreen("verify")}
-        onComplete={(answers) => {
-          const next = answersToProfile(answers, {
+        onBack={() => setScreen(profile ? "matches" : "verify")}
+        initialAnswers={answers}
+        onComplete={(nextAnswers) => {
+          const next = answersToProfile(nextAnswers, {
             campusDistrict: institution?.district ?? null,
           })
+          setAnswers(nextAnswers)
           setProfile(next)
-          void saveProfile(next, email, institution?.name)
+          setRestored(false)
+          // The save is reported, not assumed — see ProfileSync in lib/api.ts.
+          void saveProfile(next, email, institution?.name).then(setProfileSync)
           setScreen("matches")
         }}
       />
@@ -2338,7 +3647,11 @@ export default function App() {
       email={email}
       institution={institution}
       profile={profile}
-      onRestart={() => setScreen("home")}
+      profileSync={profileSync}
+      restored={restored}
+      onDismissRestored={() => setRestored(false)}
+      onEditAnswers={() => setScreen("quiz")}
+      onLogout={logOut}
     />
   )
 }

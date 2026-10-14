@@ -46,6 +46,8 @@ export type HiddenMatch = {
   id: string
   name: string
   image: string
+  /** Their institution, so the "Others" list is about a person, not a silhouette. */
+  school?: string
   reasons: GateFinding[]
 }
 
@@ -110,7 +112,13 @@ function localMatches(profile: Profile, email: string): MatchFeed {
   for (const candidate of pool) {
     const reasons = filterReasons(profile, candidate.profile)
     if (reasons.length) {
-      hidden.push({ id: candidate.id, name: candidate.name, image: candidate.image, reasons })
+      hidden.push({
+        id: candidate.id,
+        name: candidate.name,
+        image: candidate.image,
+        school: candidate.school,
+        reasons,
+      })
       continue
     }
     const result = calculateMatch(profile, candidate.profile)
@@ -168,6 +176,20 @@ export async function requestVerification(_email: string): Promise<VerificationO
 }
 
 /**
+ * Where the profile actually ended up. Returned rather than swallowed so the UI
+ * can say which one it was.
+ *
+ * This exists because of a real bug found on 14 Oct, second pass: `Figma/
+ * .env.local` carried the Next.js names (`NEXT_PUBLIC_SUPABASE_*`) in a Vite
+ * app, so `isSupabaseConfigured` was false and every "save" went to the browser
+ * and nowhere else — invisibly. "Signed out and signed back in and my data was
+ * gone" is what that looks like from the outside. The fix is the variable
+ * names; this return value is so the same class of failure can never be silent
+ * again.
+ */
+export type ProfileSync = "server" | "device"
+
+/**
  * Persist the profile built from the quiz.
  *
  * The account key is the EMAIL — there is no auth.users row. With RLS disabled
@@ -182,24 +204,35 @@ export async function saveProfile(
   profile: Profile,
   email: string,
   institutionName?: string | null,
-): Promise<void> {
+): Promise<ProfileSync> {
   localStorage.setItem("rentmate.profile", JSON.stringify(profile))
   rememberAccount(email, institutionName ?? null)
-  if (!supabase) return
-  await supabase.from("roommate_profiles").upsert({
-    email,
-    institution: institutionName ?? null,
-    about_me: profile.about_me ?? {},
-    looking_for: profile.looking_for ?? {},
-    gender_identity: profile.gender_identity ?? null,
-    belief_system: profile.belief_system ?? null,
-    mbti_type: profile.mbti_type ?? null,
-    campus_district: profile.campus_district ?? null,
-    target_areas: profile.target_areas ?? [],
-    interests: profile.interests ?? [],
-    budget_min: profile.budget_min ?? null,
-    budget_max: profile.budget_max ?? null,
-  })
+  if (!supabase) return "device"
+  try {
+    const { error } = await supabase.from("roommate_profiles").upsert({
+      email,
+      institution: institutionName ?? null,
+      about_me: profile.about_me ?? {},
+      looking_for: profile.looking_for ?? {},
+      gender_identity: profile.gender_identity ?? null,
+      belief_system: profile.belief_system ?? null,
+      mbti_type: profile.mbti_type ?? null,
+      campus_district: profile.campus_district ?? null,
+      target_areas: profile.target_areas ?? [],
+      interests: profile.interests ?? [],
+      budget_min: profile.budget_min ?? null,
+      budget_max: profile.budget_max ?? null,
+      // Added by migration 20261014173000_profile_display_fields.sql. If that
+      // migration has not been applied these two keys make the upsert fail
+      // wholesale, so a failure here falls back to "device" and the UI says so
+      // rather than pretending the profile is on the server.
+      study_year: profile.study_year ?? null,
+      major: profile.major ?? null,
+    })
+    return error ? "device" : "server"
+  } catch {
+    return "device"
+  }
 }
 
 /**
@@ -420,7 +453,12 @@ function rowToProfile(row: Record<string, unknown>): Profile {
     target_areas: targetAreas,
     budget_min: (row.budget_min as number) ?? undefined,
     budget_max: (row.budget_max as number) ?? undefined,
-    room_size: null,
+    flat_size: null,
+    // Display-only fields, added by migration 20261014173000. `?? null` rather
+    // than `?? undefined` so a row from before that migration reads as "not
+    // answered" instead of dropping the key.
+    study_year: (row.study_year as string) ?? null,
+    major: (row.major as string) ?? null,
     interests: (row.interests as string[]) ?? [],
     about_me: (row.about_me as Profile["about_me"]) ?? {},
     looking_for: (row.looking_for as Profile["looking_for"]) ?? {},
@@ -512,6 +550,40 @@ export function rememberAccount(email: string, institutionName: string | null): 
 /** The email this browser last used, or null on a first visit. */
 export function storedEmail(): string | null {
   return readAccountCache()?.email ?? null
+}
+
+/**
+ * LOG OUT — forget which account this browser was on. The profile row itself is
+ * untouched: typing the same email brings it straight back. This is the whole
+ * of "log out" on a build with no sessions, and it is deliberately NOT the same
+ * action as deleting your answers.
+ */
+export function forgetAccount(): void {
+  try {
+    localStorage.removeItem(ACCOUNT_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * RESET — delete the profile row and the local mirror. Distinct from logging
+ * out, and the only destructive account action in the app, so it sits behind a
+ * typed confirmation in the UI.
+ *
+ * The delete runs through the anon client. With RLS off that means anyone
+ * holding the anon key could delete any row — it is a demo trade-off, already
+ * documented in backend/supabase/SETUP.md, not something this function hides.
+ */
+export async function deleteAccount(email: string): Promise<void> {
+  try {
+    localStorage.removeItem("rentmate.profile")
+  } catch {
+    // ignore
+  }
+  forgetAccount()
+  if (!supabase) return
+  await supabase.from("roommate_profiles").delete().eq("email", email.trim().toLowerCase())
 }
 
 // ---------------------------------------------------------------------------

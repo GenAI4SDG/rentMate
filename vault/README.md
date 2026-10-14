@@ -7,24 +7,24 @@ validators, same approval mechanics.
 This is a **solo methodology run on an offshoot branch** (`AI-random-bs-go`). The
 object is to see how the IP → CP → PG → gate pipeline behaves on a real repo — not
 to contribute to the team's documents. The team's contradictory md docs were
-removed from this branch (see `NOTES.md` §5); the surviving primary sources are
-`docs/GENAI SDG interim draft.pdf` and the `Figma/` export. Nothing is lost —
+removed from this branch (see [`NOTES.md`](NOTES.md) §5); the surviving primary sources are
+[`docs/GENAI SDG interim draft.pdf`](../docs/GENAI%20SDG%20interim%20draft.pdf) and the `Figma/` export. Nothing is lost —
 `main` still holds every file.
 
 ## What is here
 
 | Path | What it is |
 |---|---|
-| `ips/IP.rentmate.v3.md` | **The current intent tree.** RentMate's four focuses, rewritten against the shipped code after the owner's 2026-10-14 decisions (email-as-identity with no Auth and no stored verification; GenAI downgraded to labelled demo content; real in-app chat with moderation; 14-question composite quiz). **approved** (agent) |
-| `ips/IP.rentmate.v2.md` | The previous intent. **Superseded by v3**, kept because v3's diff table is written against it and `NOTES.md` cites it. |
-| `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate (gender, belief, area, commute, budget, size, smoking) before scoring. **approved** (agent) |
-| `cps/CP.calculate_match.v2.md` | The deterministic score; **MBTI is a scored factor**, gender is excluded. **approved** (agent) |
-| `cps/CP.validate_institution_email.v1.md` | The university-email access gate. **approved** (agent) |
-| `PG.rentmate.v3.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
-| `NOTES.md` | The agent's informal views: the drift it found, what the owner overruled, what the methodology is worth, and what was deleted |
-| `checks/rentmate_reference_impls.py` | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
-| `checks/build_rentmate_pg.py` | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
-| `checks/matching_ts_check.ts` | Runs `Figma/src/lib/matching.ts` against `CP.calculate_match.v2`'s eight oracle cases |
+| [`ips/IP.rentmate.v3.md`](ips/IP.rentmate.v3.md) | **The current intent tree.** RentMate's four focuses, rewritten against the shipped code after the owner's 2026-10-14 decisions (email-as-identity with no Auth and no stored verification; GenAI downgraded to labelled demo content; real in-app chat with moderation; 20-question quiz). **approved** (agent) |
+| [`ips/IP.rentmate.v2.md`](ips/IP.rentmate.v2.md) | The previous intent. **Superseded by v3**, kept because v3's diff table is written against it and [`NOTES.md`](NOTES.md) cites it. |
+| [`cps/CP.filter_eligible_matches.v1.md`](cps/CP.filter_eligible_matches.v1.md) | Hard-constraint gate (gender, belief, area, commute, budget, size, smoking) before scoring. **approved** (agent) |
+| [`cps/CP.calculate_match.v2.md`](cps/CP.calculate_match.v2.md) | The deterministic score; **MBTI is a scored factor**, gender is excluded. **approved** (agent) |
+| [`cps/CP.validate_institution_email.v1.md`](cps/CP.validate_institution_email.v1.md) | The university-email access gate. **approved** (agent) |
+| [`PG.rentmate.v3.json`](PG.rentmate.v3.json) | The Project Graph — the CPs abstracted into facts, **built from disk** by [`checks/build_rentmate_pg.py`](checks/build_rentmate_pg.py), never hand-typed |
+| [`NOTES.md`](NOTES.md) | The agent's informal views: the drift it found, what the owner overruled, what the methodology is worth, and what was deleted |
+| [`checks/rentmate_reference_impls.py`](checks/rentmate_reference_impls.py) | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
+| [`checks/build_rentmate_pg.py`](checks/build_rentmate_pg.py) | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
+| [`checks/matching_ts_check.ts`](checks/matching_ts_check.ts) | Runs [`Figma/src/lib/matching.ts`](../Figma/src/lib/matching.ts) against `CP.calculate_match.v2`'s eight oracle cases |
 
 ### Why there are three files where there used to be one
 
@@ -34,7 +34,7 @@ cases.** That is the split doing its job — an intent change that would
 otherwise have forced three contract rewrites cost a prose rewrite instead.
 
 The v2 file is kept, not deleted, because v3's "what changed and why" table is
-written against it and `NOTES.md` cites it throughout. If the two ever
+written against it and [`NOTES.md`](NOTES.md) cites it throughout. If the two ever
 disagree about what the product is, **v3 wins** — that is the whole point of a
 version number.
 
@@ -96,8 +96,8 @@ comment above its `effects` block.
 
 ## The Project Graph, and one real finding about its schema
 
-`PG.rentmate.v3.json` holds three facts (one per CP), built by
-`checks/build_rentmate_pg.py` from the CP corpus — never hand-typed, because a
+[`PG.rentmate.v3.json`](PG.rentmate.v3.json) holds three facts (one per CP), built by
+[`checks/build_rentmate_pg.py`](checks/build_rentmate_pg.py) from the CP corpus — never hand-typed, because a
 hand-typed PG could silently disagree with the corpus. It validates **0 hard / 0
 soft**, coverage is **ok**, staleness is **ok**.
 
