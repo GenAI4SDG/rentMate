@@ -617,3 +617,155 @@ a { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* --- RentMate additions: match narrative + listing price context --- */
+.compatibility-narrative {
+  margin: 10px 0 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #4a453f;
+}
+
+.compatibility-narrative small {
+  display: inline;
+  opacity: .7;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+
+.detail-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: #7a736a;
+}
+
+/* --- RentMate: the icebreaker hook deck ------------------------------------
+   Replaces the ranked grid. One card at a time, and the card leads with a
+   shared thing rather than a number — the score is demoted to a corner. */
+
+.match-toolbar .hook-counter {
+  padding: 8px 13px;
+  border: 1px solid #d2cec5;
+  border-radius: 8px;
+  background: var(--paper);
+  color: #7a736a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hook-empty {
+  margin: 22px 0;
+  padding: 28px;
+  border: 1px dashed #d7d2c8;
+  border-radius: 14px;
+  color: #7a736a;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.hook-card {
+  display: grid;
+  grid-template-columns: minmax(230px, 32%) 1fr;
+  overflow: hidden;
+  border: 1px solid #ddd9d0;
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 18px 44px rgba(49, 37, 29, .07);
+}
+
+.hook-portrait { position: relative; min-height: 100%; background: #e9e3d9; }
+.hook-portrait > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hook-portrait > .verified-chip { position: absolute; left: 14px; bottom: 14px; background: rgba(245, 250, 241, .92); backdrop-filter: blur(8px); }
+
+.hook-body { display: flex; flex-direction: column; gap: 18px; padding: 30px 32px 26px; }
+
+.hook-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.hook-head h2 { margin: 0; font: 500 30px/1.1 "Playfair Display", serif; letter-spacing: -.03em; }
+.hook-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.hook-score { flex: none; display: grid; text-align: right; }
+.hook-score b { color: var(--terracotta); font: 500 30px "Playfair Display", serif; }
+.hook-score span { color: #aaa69f; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+
+.hook-tagline { margin: -8px 0 0; color: #6d675f; font-size: 12px; font-style: italic; }
+
+.hook-bubble { padding: 18px 20px; border: 1px solid #e7ddcc; border-radius: 14px; background: #f5efe4; }
+.hook-flag { display: inline-block; margin-bottom: 9px; color: var(--terracotta-dark); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.hook-line { margin: 0; color: #2c332e; font-size: 17px; line-height: 1.5; }
+.hook-also { display: grid; gap: 7px; margin: 13px 0 0; padding: 13px 0 0; border-top: 1px dashed #ddd0b9; list-style: none; }
+.hook-also li { color: #6d675f; font-size: 12px; line-height: 1.55; }
+.hook-also li::before { content: "also "; color: #a89e8f; font-style: italic; }
+
+.hook-reactions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hook-reactions > span { width: 100%; color: #9c968c; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.hook-reactions button { padding: 10px 15px; border: 1px solid #d8d2c7; border-radius: 999px; background: #fff; font-size: 13px; cursor: pointer; transition: transform .15s, border-color .15s, background .15s; }
+.hook-reactions button:hover { transform: translateY(-1px); border-color: var(--terracotta); background: #fdf3ee; }
+.hook-reactions .react-wait { border-color: #e2c3b2; background: #fbeee7; color: var(--terracotta-dark); font-weight: 600; }
+.hook-reactions .react-pass { color: #9c968c; }
+
+.hook-reply { display: flex; gap: 13px; padding: 15px 17px; border: 1px solid #d3ddc9; border-radius: 14px; background: #e7ecdf; }
+.hook-reply img { width: 34px; height: 34px; flex: none; border-radius: 50%; object-fit: cover; }
+.hook-reply small { display: block; margin-bottom: 5px; color: #6f7d68; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.hook-reply p { margin: 0; color: #384034; font-size: 13px; line-height: 1.6; }
+
+.hook-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin: 0; padding-top: 16px; border-top: 1px solid #ebe7df; }
+.hook-meta dt { margin-bottom: 4px; color: #a49e94; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.hook-meta dd { margin: 0; color: #3d443e; font-size: 12px; line-height: 1.5; }
+
+.hook-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
+.hook-actions .primary-button { flex: 1 1 190px; }
+.hook-actions .outline-button { flex: 0 1 auto; width: auto; margin-top: 0; padding: 0 18px; min-height: 54px; border-radius: 12px; font-size: 12px; }
+
+.hook-dots { display: flex; justify-content: center; gap: 8px; margin-top: 22px; }
+.hook-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: #d5cfc4; cursor: pointer; transition: width .2s, background .2s; }
+.hook-dots button.active { width: 26px; border-radius: 999px; background: var(--terracotta); }
+
+/* The hidden list — the part most apps don't show. */
+.hidden-panel { margin-top: 22px; border: 1px solid #ded8cd; border-radius: 14px; background: #fbf8f2; }
+.hidden-panel > summary { display: flex; align-items: center; gap: 9px; padding: 16px 20px; color: #6a645c; font-size: 12px; font-weight: 600; cursor: pointer; list-style: none; }
+.hidden-panel > summary::-webkit-details-marker { display: none; }
+.hidden-panel > summary::after { content: "▾"; margin-left: auto; color: #b0a89c; }
+.hidden-panel[open] > summary::after { content: "▴"; }
+.hidden-panel ul { display: grid; gap: 13px; margin: 0; padding: 0 20px 18px; list-style: none; }
+.hidden-panel li { display: flex; gap: 12px; align-items: flex-start; }
+.hidden-panel li img { width: 34px; height: 34px; flex: none; border-radius: 50%; object-fit: cover; filter: grayscale(1); opacity: .75; }
+.hidden-panel li span { display: grid; gap: 3px; }
+.hidden-panel li b { font-size: 12px; }
+.hidden-panel li small { color: #8b8479; font-size: 11px; line-height: 1.45; }
+.hidden-panel li small::before { content: "— "; color: #c0b8ac; }
+.hidden-note { margin: 0; padding: 14px 20px 18px; border-top: 1px solid #ece6da; color: #8b8479; font-size: 11px; line-height: 1.6; }
+
+.modal-hooks { display: grid; gap: 7px; margin: 12px 0 18px; padding: 0; list-style: none; }
+.modal-hooks li { position: relative; padding-left: 16px; color: #4a453f; font-size: 12px; line-height: 1.55; }
+.modal-hooks li::before { content: "→"; position: absolute; left: 0; color: var(--terracotta); }
+.modal-caveat { margin: 16px 0 0; color: #9a938a; font-size: 10px; line-height: 1.5; }
+
+/* Verify + quiz additions. */
+.zh-name { color: #9a938a; font-size: 12px; }
+.demo-note { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 10px 13px; border-radius: 9px; background: #f5e7e0; color: #a9583b; font-weight: 600; }
+
+.quiz-section-note { display: grid; gap: 5px; margin-top: 22px; padding: 15px 17px; border: 1px solid #e2dcd1; border-radius: 12px; background: #fbf8f2; }
+.quiz-section-note b { font-size: 12px; }
+.quiz-section-note span { color: #8b8479; font-size: 11px; line-height: 1.5; }
+.quiz-section-note.nonneg { border-color: #e6cdbe; background: #fbf0ea; }
+.quiz-section-note.nonneg b { color: var(--terracotta-dark); }
+.quiz-section-note.bonding { border-color: #d5ddcb; background: #eef2e9; }
+.quiz-section-note.bonding b { color: #5d7355; }
+
+.option-grid.multi-options { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.option-card.dimmed { opacity: .45; cursor: not-allowed; }
+.option-card.dimmed:hover { transform: none; }
+
+.empty-hint { display: block; margin-top: 14px; color: #9a938a; font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .hook-card { grid-template-columns: 1fr; }
+  .hook-portrait { min-height: 260px; }
+  .hook-body { padding: 24px 20px 22px; }
+  .hook-head h2 { font-size: 26px; }
+  .hook-line { font-size: 16px; }
+  .hook-actions .outline-button { flex: 1 1 100%; }
+}
+
+

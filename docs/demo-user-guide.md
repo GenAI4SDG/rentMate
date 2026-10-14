@@ -9,11 +9,11 @@
 
 **RentMate** helps Hong Kong students find **compatible roommates** and explore **affordable flats**, supporting **SDG 11** (sustainable cities and communities).
 
-| Part | Folder | What it shows |
-|------|--------|----------------|
-| **Interactive UI (main demo)** | `Figma/` | Full flow with sample data — no login required |
-| **App shell (future integration)** | repo root `src/` | Placeholder until the Figma UI is merged |
-| **Backend (optional)** | `backend/` | Supabase tables, auth, storage (cloud project) |
+| Part                               | Folder           | What it shows                                  |
+| ---------------------------------- | ---------------- | ---------------------------------------------- |
+| **Interactive UI (main demo)**     | `Figma/`         | Full flow with sample data — no login required |
+| **App shell (future integration)** | repo root `src/` | Placeholder until the Figma UI is merged       |
+| **Backend (optional)**             | `backend/`       | Supabase tables, auth, storage (cloud project) |
 
 For most hackathon presentations, run **`Figma/`** only. Mention Supabase if you pushed migrations and want to show the dashboard.
 
@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Open the URL in the browser (usually **http://localhost:5173**).
+Open the URL in the browser (usually **<http://localhost:5173>**).
 
 ### 3. Optional — Supabase backend
 
@@ -61,11 +61,11 @@ You do **not** need Docker if you use **cloud** Supabase and `db push`.
 
 ## Demo script (3 minutes)
 
-1. **Landing** — “Meet your kind of people.” Explain SDG 11 and student housing in HK.  
-2. **Start matching** → enter a university-style email, e.g. `student@cuhk.edu.hk` → continue.  
-3. **Quiz** — answer all 7 questions → **See my matches**.  
-4. **Matches** — open a profile → **Connect & start chatting**.  
-5. **Messages** — send a short message.  
+1. **Landing** — “Meet your kind of people.” Explain SDG 11 and student housing in HK.
+2. **Start matching** → enter a university-style email, e.g. `student@cuhk.edu.hk` → continue.
+3. **Quiz** — answer all 7 questions → **See my matches**.
+4. **Matches** — open a profile → **Connect & start chatting**.
+5. **Messages** — send a short message.
 6. **Find a flat** — search a district, pick a listing, open **3D tour** (optional wow moment).
 
 **Say clearly:** “Profiles and listings in this build are **sample data** for the hackathon; Supabase in `backend/` is ready for real auth and listings next.”
@@ -74,12 +74,12 @@ You do **not** need Docker if you use **cloud** Supabase and `db push`.
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `command not found: npm` | Install Node.js |
-| `command not found: vite` | Run `npm install` inside `Figma/` |
-| Blank page | Check terminal for errors; try another browser |
-| `supabase db push` fails | Read the error; fix migration order; ask a teammate |
+| Problem                       | Fix                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `command not found: npm`      | Install Node.js                                                                       |
+| `command not found: vite`     | Run `npm install` inside `Figma/`                                                     |
+| Blank page                    | Check terminal for errors; try another browser                                        |
+| `supabase db push` fails      | Read the error; fix migration order; ask a teammate                                   |
 | Red squiggles on `.sql` files | Disable **SQL Server (mssql)** extension for this workspace; files are **PostgreSQL** |
 
 ---
@@ -99,9 +99,9 @@ Do **not** commit `.env` or API keys. Use `backend/.env.example` as a template o
 
 ## More documentation
 
-| Document | Purpose |
-|----------|---------|
-| [README.md](../README.md) | Project overview and team workflow |
-| [PRD.md](../PRD.md) | Product scope |
-| [TEAM-BRIEF.md](../TEAM-BRIEF.md) | Roles and dates |
-| [backend/README.md](../backend/README.md) | Supabase technical setup |
+| Document                                  | Purpose                            |
+| ----------------------------------------- | ---------------------------------- |
+| [README.md](../README.md)                 | Project overview and team workflow |
+| [PRD.md](../PRD.md)                       | Product scope                      |
+| [TEAM-BRIEF.md](../TEAM-BRIEF.md)         | Roles and dates                    |
+| [backend/README.md](../backend/README.md) | Supabase technical setup           |

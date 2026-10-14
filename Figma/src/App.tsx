@@ -1,317 +1,85 @@
-import { FormEvent, ReactNode, useMemo, useRef, useState } from "react"
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react"
+
+import { QUIZ, SECTIONS, answersToProfile } from "./lib/quiz"
+import { CURATED_CAST, DEMO_EMAIL, isCuratedEmail } from "./lib/demoData"
+import { LISTINGS, priceContext } from "./lib/listings"
+import {
+  INSTITUTIONS,
+  TOTAL_DOMAINS,
+  validateInstitutionEmail,
+  type Institution,
+} from "./lib/institutions"
+import { areaFit } from "./lib/matching"
+import {
+  REACTIONS,
+  openerPrompt,
+  reactionLabel,
+  replyFor,
+  type Hook,
+  type ReactionId,
+} from "./lib/hooks"
+import {
+  backendMode,
+  getMatches,
+  requestVerification,
+  saveProfile,
+  type MatchFeed,
+  type MatchView,
+} from "./lib/api"
+import type { Profile } from "./lib/matching"
 
 type Screen = "home" | "verify" | "quiz" | "matches"
-
-type Question = {
-  eyebrow: string
-  title: string
-  hint: string
-  options: { title: string detail?: string tone?: string }[]
-}
 
 const heroImage =
   "https://images.unsplash.com/photo-1562755484-8225ee5215ae?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1600"
 
-const questions: Question[] = [
-  {
-    eyebrow: "Home rhythms",
-    title: "Your week has been full-on. What does home look like tonight?",
-    hint: "Choose the evening that feels most restorative to you.",
-    options: [
-      {
-        title: "A quiet night in",
-        detail: "Tea, headphones, and an early reset.",
-      },
-      {
-        title: "Cooking together",
-        detail: "A shared meal and a good catch-up.",
-      },
-      {
-        title: "Friends are welcome",
-        detail: "A relaxed, social flat with some energy.",
-      },
-      {
-        title: "It changes every week",
-        detail: "I like to keep things spontaneous.",
-      },
-    ],
-  },
-  {
-    eyebrow: "Social energy",
-    title:
-      "You’re on a three-hour train ride. Which seat do you instinctively take?",
-    hint: "There is no right answer — go with your first instinct.",
-    options: [
-      {
-        title: "Next to a quiet reader",
-        detail: "Company without the pressure to chat.",
-      },
-      {
-        title: "A fully empty row",
-        detail: "Space to spread out and recharge.",
-      },
-      {
-        title: "Near a lively group",
-        detail: "The journey is better with conversation.",
-      },
-      {
-        title: "Whichever has the view",
-        detail: "My environment matters most.",
-      },
-    ],
-  },
-  {
-    eyebrow: "Conflict style",
-    title:
-      "Your flatmate accidentally breaks something sentimental. What comes first?",
-    hint: "Pick the response closest to your genuine first thought.",
-    options: [
-      {
-        title: "Let’s find a practical fix",
-        detail: "Work out what can be repaired or replaced.",
-      },
-      {
-        title: "Make sure they’re okay",
-        detail: "The relationship matters more than the object.",
-      },
-      {
-        title: "Take some time first",
-        detail: "I prefer to process before talking it through.",
-      },
-      {
-        title: "Set a clear boundary",
-        detail: "Name what happened so it does not repeat.",
-      },
-    ],
-  },
-  {
-    eyebrow: "Daily routine",
-    title: "Which household rhythm feels most like yours?",
-    hint: "Think about an ordinary weekday rather than your ideal one.",
-    options: [
-      { title: "Early bird", detail: "Up early, winding down by 11." },
-      { title: "Night owl", detail: "Most productive after sunset." },
-      {
-        title: "A flexible middle",
-        detail: "My routine shifts with my schedule.",
-      },
-      {
-        title: "Quiet hours matter most",
-        detail: "Any routine works if we respect each other.",
-      },
-    ],
-  },
-  {
-    eyebrow: "Personality",
-    title:
-      "Scientists named a new colour after your personality. Which swatch is yours?",
-    hint: "Choose the one that feels instinctively like you.",
-    options: [
-      { title: "Warm glowing terracotta", tone: "#c96b48" },
-      { title: "Crisp, cool sky blue", tone: "#8eafc2" },
-      { title: "Bright, sunny chartreuse", tone: "#b4db13" },
-      { title: "Deep, muted midnight navy", tone: "#202944" },
-    ],
-  },
-  {
-    eyebrow: "Shared space",
-    title: "How do you prefer to handle kitchen supplies?",
-    hint: "This helps prevent the tiny frictions that add up over time.",
-    options: [
-      { title: "Everything shared", detail: "No labels needed." },
-      {
-        title: "Shared basics only",
-        detail: "Oil, spices, and household staples.",
-      },
-      { title: "Mostly personal", detail: "Label what is yours." },
-      { title: "Fully separate", detail: "I prefer not to share food items." },
-    ],
-  },
-  {
-    eyebrow: "Match preferences",
-    title: "Who would you feel comfortable sharing a home with?",
-    hint: "You can update this privately in your profile at any time.",
-    options: [
-      { title: "Anyone", detail: "Compatibility matters most to me." },
-      { title: "Women only" },
-      { title: "Men only" },
-      { title: "Same gender as me" },
-    ],
-  },
-]
+const questions = QUIZ
 
-const matches = [
-  {
-    name: "Michelle Ho",
-    school: "CUHK · Year 2",
-    score: 94,
-    image:
-      "https://images.unsplash.com/photo-1688354807300-449aba9c78cb?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Same sleep schedule", "Tidy shared spaces"],
-    area: "Sha Tin",
-    budget: "$6.5–8K",
-  },
-  {
-    name: "Ryan Liu",
-    school: "HKBU · Year 3",
-    score: 91,
-    image:
-      "https://images.unsplash.com/photo-1660412625493-0c8266edddb8?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Calm communicator", "Shared basics"],
-    area: "Kowloon Tong",
-    budget: "$7–9K",
-  },
-  {
-    name: "Natalie Chow",
-    school: "HKU · Year 2",
-    score: 88,
-    image:
-      "https://images.unsplash.com/photo-1688354805578-af85ea68127d?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Same social energy", "Quiet weekdays"],
-    area: "Kennedy Town",
-    budget: "$8–10K",
-  },
-  {
-    name: "Avery Lam",
-    school: "PolyU · Year 3",
-    score: 87,
-    image:
-      "https://images.unsplash.com/photo-1621274790572-7c32596bc67f?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Early riser", "Calm shared home"],
-    area: "Hung Hom",
-    budget: "$6–8K",
-  },
-  {
-    name: "Jason Tang",
-    school: "CityU · Year 2",
-    score: 86,
-    image:
-      "https://images.unsplash.com/photo-1544168190-79c17527004f?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Shared cooking", "Direct communicator"],
-    area: "Kowloon Tong",
-    budget: "$7–9K",
-  },
-  {
-    name: "Sophie Leung",
-    school: "HKUST · Year 2",
-    score: 84,
-    image:
-      "https://images.unsplash.com/photo-1607529379169-5804750c1f9a?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Quiet evenings", "Flexible routine"],
-    area: "Tseung Kwan O",
-    budget: "$6.5–8.5K",
-  },
-  {
-    name: "Marcus Yip",
-    school: "EdUHK · Year 4",
-    score: 82,
-    image:
-      "https://images.unsplash.com/photo-1565016941625-2bee25d37f72?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Tidy shared spaces", "Social weekends"],
-    area: "Tai Po",
-    budget: "$5.5–7K",
-  },
-  {
-    name: "Chloe Wong",
-    school: "LingU · Year 3",
-    score: 81,
-    image:
-      "https://images.unsplash.com/photo-1619431667975-e93b820cde63?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Shared basics", "Quiet weekdays"],
-    area: "Tuen Mun",
-    budget: "$5–7K",
-  },
-  {
-    name: "Ethan Chan",
-    school: "HKU · Year 1",
-    score: 79,
-    image:
-      "https://images.unsplash.com/photo-1657830638749-aa27415f9a43?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Night owl", "Calm communicator"],
-    area: "Sai Ying Pun",
-    budget: "$8–10K",
-  },
-  {
-    name: "Yuki Lau",
-    school: "CUHK · Year 4",
-    score: 78,
-    image:
-      "https://images.unsplash.com/photo-1657155275125-4ce23e9cec63?crop=faces&fit=crop&fm=jpg&q=85&w=400&h=400",
-    tags: ["Same social energy", "Shared cooking"],
-    area: "Tai Wai",
-    budget: "$6–8K",
-  },
-]
+// Human labels for the scored factors, used in the factor breakdown.
+const FACTOR_LABELS: Record<string, string> = {
+  sleep_schedule: "Sleep rhythm",
+  shared_space_habits: "Shared-space habits",
+  social_guest_preference: "Hosting style",
+  noise_preference: "Noise level",
+  personal_space_preference: "Need for space",
+  bill_splitting_style: "Shared costs",
+  mbti: "Communication style",
+}
 
-const flatTitles = [
-  "Sunlit two-bedroom near MTR",
-  "Quiet flat with harbour light",
-  "Warm, compact student home",
-  "Renovated walk-up by the park",
-  "Two-bedroom with study nook",
-  "Bright corner flat near campus",
-  "Calm home above the market",
-  "Modern flat with open kitchen",
-  "High-floor home with city view",
-  "Cosy two-bedroom on a quiet lane",
-  "Student-ready flat beside MTR",
-  "Airy home with separate bedrooms",
-  "Minimal flat near waterfront",
-  "Freshly renovated shared home",
-  "Practical flat with large windows",
-  "Two-bedroom near university shuttle",
-  "Compact home with clever storage",
-  "Peaceful flat close to green space",
-  "Sunny home in a student neighbourhood",
-  "Furnished two-bedroom with workspace",
-  "Value flat with fast campus commute",
-  "Bright bedrooms and shared lounge",
-  "Move-in ready home near local shops",
-  "Comfortable flat on a quiet street",
-  "Open-plan student home near rail",
-]
+// A safe placeholder so the workspace can render before matches resolve.
+const EMPTY_MATCH: MatchView = {
+  id: "",
+  name: "—",
+  school: "",
+  area: "",
+  budget: "",
+  image: "",
+  score: null,
+  status: "insufficient_data",
+  narrative: null,
+  factors: {},
+  hooks: [],
+}
 
-const flatAreas = [
-  "Sha Tin",
-  "Kennedy Town",
-  "Kowloon Tong",
-  "Tai Wai",
-  "Hung Hom",
-  "Sai Ying Pun",
-  "Tai Po",
-  "Tseung Kwan O",
-  "Mong Kok",
-  "Tuen Mun",
-]
+type Message = { from: "them" | "me"; text: string; time: string }
 
-const flatImages = [
-  "photo-1738168246881-40f35f8aba0a",
-  "photo-1668566398322-6bbc9be03736",
-  "photo-1556593825-c11de986cb0b",
-  "photo-1761123141836-3b3221dac3e5",
-  "photo-1779785689520-bf24ef13aa71",
-  "photo-1774311237295-a65a4c1ff38a",
-  "photo-1759691555010-7f3f8674d2f2",
-]
+/**
+ * The commute note for a match's target area. Deliberately shows the word
+ * "estimated" — there is no journey API behind this, only district centroids.
+ */
+function commuteNote(
+  area: string,
+  campusDistrict: string | null,
+  limit: number | null,
+): string | null {
+  if (!campusDistrict) return null
+  const fit = areaFit(area, campusDistrict, limit)
+  return fit ? fit.note : null
+}
 
-const flats = flatTitles.map((title, index) => {
-  const area = flatAreas[index % flatAreas.length]
-  const squareFeet = 410 + ((index * 37) % 190)
-  const price = 12800 + ((index * 850) % 7200)
-  return {
-    id: index + 1,
-    title,
-    area,
-    price: `$${price.toLocaleString("en-US")}`,
-    mapPrice: `$${(price / 1000).toFixed(1)}k`,
-    details: `2 beds · 1 bath · ${squareFeet} sq ft`,
-    commute: `${6 + ((index * 3) % 17)} min to campus`,
-    image: `https://images.unsplash.com/${flatImages[index % flatImages.length]}?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=900&h=620`,
-    x: 10 + ((index * 29) % 78),
-    y: 12 + ((index * 17) % 72),
-    rating: (4.6 + (index % 4) / 10).toFixed(1),
-  }
-})
+const scoreLabel = (score: number | null) => (score === null ? "—" : `${score}%`)
+
+const flats = LISTINGS
 
 const roomViews = [
   {
@@ -475,8 +243,8 @@ function Home({ onStart }: { onStart: () => void }) {
         <div className="hero-copy">
           <div className="community-pill">
             <span className="avatar-stack" aria-hidden="true">
-              {matches.map((match) => (
-                <img key={match.name} src={match.image} alt="" />
+              {CURATED_CAST.slice(0, 6).map((candidate) => (
+                <img key={candidate.id} src={candidate.image} alt="" />
               ))}
             </span>
             <span>Built for Hong Kong students</span>
@@ -494,19 +262,21 @@ function Home({ onStart }: { onStart: () => void }) {
           <button className="hero-cta" onClick={onStart}>
             <span>
               <b>Start matching</b>
-              <small>Free · Takes about 3 minutes</small>
+              <small>
+                Free · {questions.length} questions · about 4 minutes
+              </small>
             </span>
             <span className="cta-icon">
               <Icon name="arrow" />
             </span>
           </button>
         </div>
-        <div className="hero-stats">
+        <div className="hero-stats" id="trust">
           <span>
             <b>Verified</b> student community
           </span>
           <span>
-            <b>7</b> thoughtful questions
+            <b>{questions.length}</b> thoughtful questions
           </span>
           <span>
             <b>Private</b> by design
@@ -535,8 +305,8 @@ function Home({ onStart }: { onStart: () => void }) {
             ],
             [
               "03",
-              "Meet your best matches",
-              "See compatibility clearly, then choose who to connect with.",
+              "Open with something real",
+              "Every match arrives with one thing you actually have in common — not a ranking.",
             ],
           ].map(([number, title, body]) => (
             <article key={number}>
@@ -581,16 +351,35 @@ function Verify({
   onVerified,
 }: {
   onBack: () => void
-  onVerified: (email: string) => void
+  onVerified: (email: string, institution: Institution | null) => void
 }) {
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(DEMO_EMAIL)
   const [touched, setTouched] = useState(false)
-  const valid = /^[^\s@]+@[^\s@]+\.(edu\.hk|hk)$/i.test(email)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState("")
+  // Exact allowlist match — see lib/institutions.ts (CP.validate_institution_email.v1).
+  const check = validateInstitutionEmail(email)
+  const valid = check.eligible
+  // The curated demo cast is reached through a demo/admin local part, never a
+  // normal student address. See lib/demoData.ts.
+  const curated = isCuratedEmail(email)
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     setTouched(true)
-    if (valid) onVerified(email)
+    if (!valid) return
+    setSending(true)
+    setError("")
+    try {
+      await requestVerification(email)
+      onVerified(email, check.institution)
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not send the verification email.",
+      )
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -613,7 +402,7 @@ function Verify({
             Rent Mate is built exclusively for Hong Kong’s student community.
             Verify your local university email to continue.
           </p>
-          <div className="trust-list" id="trust">
+          <div className="trust-list" id="verify-trust">
             <div>
               <span>
                 <Icon name="check" size={15} />
@@ -647,8 +436,9 @@ function Verify({
           <span className="card-number">01</span>
           <h2>Verify your email</h2>
           <p>
-            Use a university address ending in <b>.edu.hk</b>, or another Hong
-            Kong domain.
+            Use the email your university issued you. We check it against{" "}
+            {INSTITUTIONS.length} Hong Kong institutions, then use your campus
+            as the anchor for every commute estimate.
           </p>
           <label htmlFor="email">University email</label>
           <div
@@ -667,15 +457,31 @@ function Verify({
           </div>
           {touched && !valid ? (
             <p className="field-message error">
-              Enter a valid Hong Kong university email.
+              That domain isn’t on our list yet. We accept {INSTITUTIONS.length}{" "}
+              Hong Kong institutions across {TOTAL_DOMAINS} email domains —
+              check the address.
+            </p>
+          ) : valid && check.institution ? (
+            <p className="field-message">
+              Recognised as <b>{check.institution.name}</b>{" "}
+              <span className="zh-name">{check.institution.nameZh}</span>.{" "}
+              We only check your email domain — no email is sent.
             </p>
           ) : (
             <p className="field-message">
               We’ll send you a secure verification link.
             </p>
           )}
-          <button className="primary-button" disabled={!valid}>
-            Verify & continue <Icon name="arrow" size={19} />
+          {valid && curated && (
+            <p className="field-message demo-note">
+              <Icon name="spark" size={14} /> Demo sign-in — this unlocks the
+              curated cast, with real place stories and replies.
+            </p>
+          )}
+          {error && <p className="field-message error">{error}</p>}
+          <button className="primary-button" disabled={!valid || sending}>
+            {sending ? "Sending…" : "Verify & continue"}{" "}
+            <Icon name="arrow" size={19} />
           </button>
           <div className="required-note">
             <Icon name="lock" size={14} /> Required to keep our community
@@ -692,17 +498,40 @@ function Quiz({
   onComplete,
 }: {
   onBack: () => void
-  onComplete: () => void
+  onComplete: (answers: (number | number[] | undefined)[]) => void
 }) {
   const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<number[]>([])
+  const [answers, setAnswers] = useState<(number | number[] | undefined)[]>([])
   const question = questions[index]
-  const selected = answers[index]
+  const selection = answers[index]
   const percent = ((index + 1) / questions.length) * 100
+  const section = SECTIONS[question.section]
+  const multi = question.kind === "multi"
+  const selectedIndices = multi
+    ? Array.isArray(selection)
+      ? selection
+      : []
+    : selection === undefined
+      ? []
+      : [selection as number]
+  const maxed = multi && question.max !== undefined && selectedIndices.length >= question.max
+  // Optional questions may be skipped; everything else needs an answer.
+  const canContinue = question.optional || selectedIndices.length > 0
 
   function choose(optionIndex: number) {
     const next = [...answers]
-    next[index] = optionIndex
+    if (!multi) {
+      next[index] = optionIndex
+    } else {
+      const current = Array.isArray(next[index]) ? (next[index] as number[]) : []
+      if (current.includes(optionIndex)) {
+        next[index] = current.filter((i) => i !== optionIndex)
+      } else if (question.max === undefined || current.length < question.max) {
+        next[index] = [...current, optionIndex]
+      } else {
+        return
+      }
+    }
     setAnswers(next)
   }
 
@@ -712,8 +541,8 @@ function Quiz({
   }
 
   function next() {
-    if (selected === undefined) return
-    if (index === questions.length - 1) onComplete()
+    if (!canContinue) return
+    if (index === questions.length - 1) onComplete(answers)
     else {
       setIndex(index + 1)
       window.scrollTo({ top: 0, behavior: "smooth" })
@@ -738,6 +567,10 @@ function Quiz({
               <b>{String(questions.length).padStart(2, "0")}</b> total
             </span>
           </div>
+          <div className={`quiz-section-note ${question.section}`}>
+            <b>{section.label}</b>
+            <span>{section.blurb}</span>
+          </div>
           <div className="aside-quote">
             “Compatibility is not about being identical. It’s about knowing
             where you naturally align.”
@@ -756,52 +589,67 @@ function Quiz({
           <h1>{question.title}</h1>
           <p className="question-hint">{question.hint}</p>
           <div
-            className={`option-grid ${
+            className={`option-grid ${multi ? "multi-options" : ""} ${
               question.options.some((option) => option.tone)
                 ? "colour-options"
                 : ""
             }`}
           >
-            {question.options.map((option, optionIndex) => (
-              <button
-                key={option.title}
-                className={`option-card ${
-                  selected === optionIndex ? "selected" : ""
-                }`}
-                onClick={() => choose(optionIndex)}
-              >
-                {option.tone ? (
-                  <span
-                    className="colour-swatch"
-                    style={{ background: option.tone }}
-                  />
-                ) : (
-                  <span className="option-letter">
-                    {String.fromCharCode(65 + optionIndex)}
+            {question.options.map((option, optionIndex) => {
+              const isSelected = selectedIndices.includes(optionIndex)
+              const isDisabled = multi && !isSelected && maxed
+              return (
+                <button
+                  key={option.title}
+                  className={`option-card ${isSelected ? "selected" : ""} ${
+                    isDisabled ? "dimmed" : ""
+                  }`}
+                  onClick={() => choose(optionIndex)}
+                  disabled={isDisabled}
+                >
+                  {option.tone ? (
+                    <span
+                      className="colour-swatch"
+                      style={{ background: option.tone }}
+                    />
+                  ) : (
+                    <span className="option-letter">
+                      {multi
+                        ? isSelected
+                          ? "✓"
+                          : "+"
+                        : String.fromCharCode(65 + optionIndex)}
+                    </span>
+                  )}
+                  <span className="option-copy">
+                    <b>{option.title}</b>
+                    {option.detail && <small>{option.detail}</small>}
                   </span>
-                )}
-                <span className="option-copy">
-                  <b>{option.title}</b>
-                  {option.detail && <small>{option.detail}</small>}
-                </span>
-                <span className="option-check">
-                  <Icon name="check" size={15} />
-                </span>
-              </button>
-            ))}
+                  <span className="option-check">
+                    <Icon name="check" size={15} />
+                  </span>
+                </button>
+              )
+            })}
           </div>
           <div className="quiz-footer">
             <span>
-              {selected === undefined
-                ? "Choose one to continue"
-                : "Looking good — ready when you are"}
+              {multi
+                ? `${selectedIndices.length} selected${
+                    question.max !== undefined ? ` · up to ${question.max}` : ""
+                  }`
+                : question.optional && selectedIndices.length === 0
+                  ? "Optional — skip if you'd rather not say"
+                  : selectedIndices.length === 0
+                    ? "Choose one to continue"
+                    : "Looking good — ready when you are"}
             </span>
             <button
               className="primary-button"
-              disabled={selected === undefined}
+              disabled={!canContinue}
               onClick={next}
             >
-              {index === questions.length - 1 ? "See my matches" : "Continue"}{" "}
+              {index === questions.length - 1 ? "See my starters" : "Continue"}{" "}
               <Icon name="arrow" />
             </button>
           </div>
@@ -811,57 +659,140 @@ function Quiz({
   )
 }
 
-function MatchCard({
+const HOOK_FLAGS: Record<Hook["kind"], string> = {
+  story: "They know this area",
+  interest: "You both…",
+  area: "Same search",
+  lifestyle: "How you'd live",
+  mbti: "How you'd get on",
+}
+
+function HookCard({
   match,
+  index,
+  total,
+  campusDistrict,
+  limit,
+  reacted,
+  onReact,
   onOpen,
+  onNext,
 }: {
-  match: typeof matches[number]
+  match: MatchView
+  index: number
+  total: number
+  campusDistrict: string | null
+  limit: number | null
+  reacted: { reaction: ReactionId; reply: string } | undefined
+  onReact: (id: ReactionId) => void
   onOpen: () => void
+  onNext: () => void
 }) {
   const [saved, setSaved] = useState(false)
+  const first = match.name.split(" ")[0]
+  const hook = match.hooks[0] ?? null
+  const others = match.hooks.slice(1, 3)
+  const note = commuteNote(match.area, campusDistrict, limit)
+
   return (
-    <article className="match-card" onClick={onOpen}>
-      <div className="match-photo">
+    <article className="hook-card">
+      <div className="hook-portrait">
         <img src={match.image} alt={`${match.name}, ${match.school}`} />
+        <span className="verified-chip">
+          <Icon name="check" size={12} /> Verified student
+        </span>
         <button
           className={`save-button ${saved ? "saved" : ""}`}
-          onClick={(event) => {
-            event.stopPropagation()
-            setSaved(!saved)
-          }}
-          aria-label={saved ? "Remove from saved" : "Save match"}
+          onClick={() => setSaved(!saved)}
+          aria-label={saved ? "Remove from saved" : "Save this match"}
         >
           <Icon name="heart" size={18} />
         </button>
-        <span className="verified-chip">
-          <Icon name="check" size={12} /> Verified
-        </span>
       </div>
-      <div className="match-body">
-        <div className="match-title">
+
+      <div className="hook-body">
+        <header className="hook-head">
           <div>
-            <h3>{match.name}</h3>
+            <h2>{match.name}</h2>
             <p>{match.school}</p>
           </div>
-          <div className="match-score">
-            <b>{match.score}%</b>
-            <span>match</span>
+          <div className="hook-score">
+            <b>{scoreLabel(match.score)}</b>
+            <span>lifestyle fit</span>
           </div>
-        </div>
-        <div className="match-tags">
-          {match.tags.map((tag) => (
-            <span key={tag}>{tag}</span>
-          ))}
-        </div>
-        <div className="match-meta">
-          <span>
-            <Icon name="home" size={14} /> {match.area}
+        </header>
+        {match.tagline && <p className="hook-tagline">{match.tagline}</p>}
+
+        <div className="hook-bubble">
+          <span className="hook-flag">
+            {hook ? HOOK_FLAGS[hook.kind] : "Nothing obvious yet"}
           </span>
-          <span>{match.budget} / mo</span>
+          <p className="hook-line">
+            {hook
+              ? hook.text
+              : `${first} hasn't answered enough of the same questions for us to find something you share. That's worth knowing before you message.`}
+          </p>
+          {others.length > 0 && (
+            <ul className="hook-also">
+              {others.map((other) => (
+                <li key={other.id}>{other.text}</li>
+              ))}
+            </ul>
+          )}
         </div>
-        <button className="view-profile">
-          View compatibility <Icon name="arrow" size={17} />
-        </button>
+
+        {reacted ? (
+          <div className="hook-reply">
+            <img src={match.image} alt="" />
+            <div>
+              <small>
+                {first} replied to “{reactionLabel(reacted.reaction)}”
+              </small>
+              <p>{reacted.reply}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="hook-reactions">
+            <span>React to open the conversation</span>
+            {REACTIONS.map((reaction) => (
+              <button
+                key={reaction.id}
+                className={`react-${reaction.id}`}
+                onClick={() => onReact(reaction.id)}
+                title={reaction.hint}
+              >
+                {reaction.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <dl className="hook-meta">
+          <div>
+            <dt>Target area</dt>
+            <dd>{match.area}</dd>
+          </div>
+          <div>
+            <dt>Budget</dt>
+            <dd>{match.budget} / mo</dd>
+          </div>
+          {note && (
+            <div>
+              <dt>Commute</dt>
+              <dd>{note}</dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="hook-actions">
+          <button className="outline-button" onClick={onOpen}>
+            Full profile &amp; factors
+          </button>
+          <button className="primary-button" onClick={onNext}>
+            {index === total - 1 ? "Back to the start" : "Next starter"}{" "}
+            <Icon name="arrow" size={18} />
+          </button>
+        </div>
       </div>
     </article>
   )
@@ -869,35 +800,31 @@ function MatchCard({
 
 function Matches({
   email,
+  institution,
+  profile,
   onRestart,
 }: {
   email: string
+  institution: Institution | null
+  profile: Profile | null
   onRestart: () => void
 }) {
   type WorkspaceTab = "matches" | "messages" | "flats"
-  const [activeMatch, setActiveMatch] = useState<typeof matches[number] | null>(
-    null,
-  )
+  const [feed, setFeed] = useState<MatchFeed>({
+    matches: [],
+    hidden: [],
+    curated: false,
+  })
+  const [loadingMatches, setLoadingMatches] = useState(true)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeMatch, setActiveMatch] = useState<MatchView | null>(null)
+  const [reacted, setReacted] = useState<
+    Record<string, { reaction: ReactionId; reply: string }>
+  >({})
+  const [threads, setThreads] = useState<Record<string, Message[]>>({})
   const [tab, setTab] = useState<WorkspaceTab>("matches")
-  const [chatMatch, setChatMatch] = useState(matches[0])
+  const [chatId, setChatId] = useState("")
   const [draft, setDraft] = useState("")
-  const [messages, setMessages] = useState([
-    {
-      from: "them",
-      text: "Hi! I saw we matched on quiet weekdays and keeping shared spaces tidy. That sounds ideal.",
-      time: "10:24",
-    },
-    {
-      from: "me",
-      text: "Same here. I’m hoping to find somewhere near the East Rail line. Are you already looking?",
-      time: "10:31",
-    },
-    {
-      from: "them",
-      text: "Yes, mostly Sha Tin and Tai Wai. Want to shortlist a few flats together?",
-      time: "10:34",
-    },
-  ])
   const [search, setSearch] = useState("")
   const [shortlist, setShortlist] = useState<number[]>([1])
   const [selectedFlat, setSelectedFlat] = useState(flats[0])
@@ -912,7 +839,7 @@ function Matches({
   )
   const [mobileMap, setMobileMap] = useState(false)
   const arVideoRef = useRef<HTMLVideoElement>(null)
-  const panoramaDrag = useRef<{ startX: number startAngle: number } | null>(
+  const panoramaDrag = useRef<{ startX: number; startAngle: number } | null>(
     null,
   )
   const firstName = useMemo(
@@ -923,8 +850,75 @@ function Matches({
     `${flat.title} ${flat.area}`.toLowerCase().includes(search.toLowerCase()),
   )
 
-  function startChat(match: typeof matches[number]) {
-    setChatMatch(match)
+  const matches = feed.matches
+  const hidden = feed.hidden
+  const current = matches[activeIndex] ?? null
+  const chatMatch = matches.find((m) => m.id === chatId) ?? matches[0] ?? EMPTY_MATCH
+  const thread = threads[chatMatch.id] ?? []
+  // The verified institution is the commute anchor for every estimate on screen.
+  const campusDistrict = institution?.district ?? null
+  const commuteLimit = profile?.looking_for?.max_commute_minutes ?? null
+
+  // Compute the feed once the profile is known. Prefers the Edge Function for the
+  // score; lib/api.ts falls back to local scoring, and the hooks are local always.
+  useEffect(() => {
+    let cancelled = false
+    if (!profile) {
+      setLoadingMatches(false)
+      return
+    }
+    getMatches(profile, email)
+      .then((result) => {
+        if (cancelled) return
+        setFeed(result)
+        setActiveIndex(0)
+        // Seed any conversation that already exists, so Messages is not empty.
+        const seeded: Record<string, Message[]> = {}
+        for (const match of result.matches) {
+          if (match.thread?.length) seeded[match.id] = match.thread
+        }
+        setThreads(seeded)
+        if (result.matches[0]) setChatId(result.matches[0].id)
+        setLoadingMatches(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingMatches(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [profile, email])
+
+  // Price context vs the district average (see lib/listings.ts). Null when the
+  // district has no figure on file — "not provided" beats a fake comparison.
+  const flatContext = priceContext(selectedFlat.area, selectedFlat.price)
+
+  /** Reacting is the opener: it sends the reaction and appends their cached reply. */
+  function react(match: MatchView, reaction: ReactionId) {
+    const reply = replyFor(match, reaction, match.hooks[0] ?? null)
+    if (reaction === "pass" || !reply) {
+      advance()
+      return
+    }
+    setReacted((prev) => ({ ...prev, [match.id]: { reaction, reply } }))
+    setThreads((prev) => ({
+      ...prev,
+      [match.id]: [
+        ...(prev[match.id] ?? []),
+        { from: "me", text: reactionLabel(reaction), time: "Now" },
+        { from: "them", text: reply, time: "Now" },
+      ],
+    }))
+  }
+
+  function advance() {
+    if (!matches.length) return
+    setActiveIndex((index) => (index + 1) % matches.length)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  function startChat(match: MatchView) {
+    setChatId(match.id)
     setActiveMatch(null)
     setTab("messages")
   }
@@ -932,8 +926,14 @@ function Matches({
   function sendMessage(event: FormEvent) {
     event.preventDefault()
     const text = draft.trim()
-    if (!text) return
-    setMessages([...messages, { from: "me", text, time: "Now" }])
+    if (!text || !chatMatch.id) return
+    setThreads((prev) => ({
+      ...prev,
+      [chatMatch.id]: [
+        ...(prev[chatMatch.id] ?? []),
+        { from: "me", text, time: "Now" },
+      ],
+    }))
     setDraft("")
   }
 
@@ -1031,7 +1031,9 @@ function Matches({
         <>
           <section className="matches-hero">
             <div>
-              <p className="section-kicker">Your shortlist is ready</p>
+              <p className="section-kicker">
+                {feed.curated ? "Curated demo cast" : "Your conversation starters"}
+              </p>
               <h1>
                 People who feel
                 <br />
@@ -1039,34 +1041,115 @@ function Matches({
               </h1>
             </div>
             <p>
-              We found these matches based on the routines, boundaries, and
-              little details that make sharing a home work.
+              No grid, no swiping. Each card opens with one real thing you two
+              have in common — react to it and the conversation has already
+              started.
             </p>
           </section>
           <section className="match-section">
             <div className="match-toolbar">
               <p>
-                <b>10 compatible students</b>
-                <span>Updated from your lifestyle profile</span>
+                <b>
+                  {loadingMatches
+                    ? "Finding compatible students…"
+                    : `${matches.length} ${
+                        matches.length === 1 ? "person" : "people"
+                      } cleared your non-negotiables`}
+                </b>
+                <span>
+                  {backendMode === "supabase"
+                    ? "Scored by the Supabase backend"
+                    : "Demo mode · scored in your browser"}
+                  {campusDistrict ? ` · anchored to ${campusDistrict}` : ""}
+                </span>
               </p>
-              <button>
-                Best match <span>↓</span>
-              </button>
+              {matches.length > 0 && (
+                <span className="hook-counter">
+                  {activeIndex + 1} / {matches.length}
+                </span>
+              )}
             </div>
-            <div className="match-grid">
-              {matches.map((match) => (
-                <MatchCard
-                  key={match.name}
-                  match={match}
-                  onOpen={() => setActiveMatch(match)}
+
+            {loadingMatches && <p className="hook-empty">Scoring your answers…</p>}
+
+            {!loadingMatches && matches.length === 0 && (
+              <p className="hook-empty">
+                Nobody cleared your non-negotiables. That's the filters working,
+                not a bug — loosen one to see more people.
+              </p>
+            )}
+
+            {current && (
+              <>
+                <HookCard
+                  key={current.id}
+                  match={current}
+                  index={activeIndex}
+                  total={matches.length}
+                  campusDistrict={campusDistrict}
+                  limit={commuteLimit}
+                  reacted={reacted[current.id]}
+                  onReact={(id) => react(current, id)}
+                  onOpen={() => setActiveMatch(current)}
+                  onNext={advance}
                 />
-              ))}
-            </div>
+                {matches.length > 1 && (
+                  <nav className="hook-dots" aria-label="Match navigation">
+                    {matches.map((match, index) => (
+                      <button
+                        key={match.id}
+                        className={index === activeIndex ? "active" : ""}
+                        onClick={() => setActiveIndex(index)}
+                        aria-label={`Show ${match.name}`}
+                      />
+                    ))}
+                  </nav>
+                )}
+              </>
+            )}
+
+            {hidden.length > 0 && (
+              <details className="hidden-panel">
+                <summary>
+                  <Icon name="lock" size={15} /> We hid {hidden.length}{" "}
+                  {hidden.length === 1 ? "person" : "people"} because of your
+                  non-negotiables
+                </summary>
+                <ul>
+                  {hidden.map((person) => (
+                    <li key={person.id}>
+                      <img src={person.image} alt="" />
+                      <span>
+                        <b>{person.name}</b>
+                        {person.reasons.map((reason) => (
+                          <small key={`${reason.field}-${reason.side}`}>
+                            {reason.text}
+                          </small>
+                        ))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="hidden-note">
+                  This is the part most apps hide. The hard filters decide who you
+                  see; the score never overrides them.
+                </p>
+              </details>
+            )}
+
             <div className="matches-note">
               <Icon name="spark" />
               <p>
-                <b>Your matches get better over time.</b>
-                <span>Update your preferences whenever your plans change.</span>
+                <b>
+                  {feed.curated
+                    ? "You're signed in as the demo account."
+                    : "Your matches get better over time."}
+                </b>
+                <span>
+                  {feed.curated
+                    ? "The curated cast is synthetic — written for this demo. The districts and the kinds of places are real; the people are not."
+                    : "Synthetic demo profiles · no real students in this pool."}
+                </span>
               </p>
             </div>
           </section>
@@ -1080,24 +1163,34 @@ function Matches({
               <p className="section-kicker">Connections</p>
               <h1>Messages</h1>
             </div>
-            {matches.map((match, index) => (
-              <button
-                key={match.name}
-                className={chatMatch.name === match.name ? "active" : ""}
-                onClick={() => setChatMatch(match)}
-              >
-                <img src={match.image} alt="" />
-                <span>
-                  <b>{match.name}</b>
-                  <small>
-                    {index === 0
-                      ? "Want to shortlist a few flats..."
-                      : "You’re connected — say hello"}
-                  </small>
-                </span>
-                {index === 0 && <i />}
-              </button>
-            ))}
+            {matches.map((match) => {
+              const last = threads[match.id]?.[threads[match.id].length - 1]
+              return (
+                <button
+                  key={match.id}
+                  className={chatMatch.id === match.id ? "active" : ""}
+                  onClick={() => setChatId(match.id)}
+                >
+                  <img src={match.image} alt="" />
+                  <span>
+                    <b>{match.name}</b>
+                    <small>
+                      {last
+                        ? `${last.text.slice(0, 42)}${
+                            last.text.length > 42 ? "…" : ""
+                          }`
+                        : "You're connected — say hello"}
+                    </small>
+                  </span>
+                  {threads[match.id]?.length ? <i /> : null}
+                </button>
+              )
+            })}
+            {!loadingMatches && matches.length === 0 && (
+              <p className="empty-shortlist">
+                No connections yet. React to a starter on the Matches tab.
+              </p>
+            )}
           </aside>
           <div className="chat-thread">
             <header>
@@ -1105,7 +1198,7 @@ function Matches({
               <span>
                 <b>{chatMatch.name}</b>
                 <small>
-                  <i /> Connected · {chatMatch.score}% match
+                  <i /> Connected · {scoreLabel(chatMatch.score)} match
                 </small>
               </span>
               <button onClick={() => setTab("flats")}>
@@ -1114,8 +1207,8 @@ function Matches({
             </header>
             <div className="message-stream">
               <div className="conversation-date">Today</div>
-              {chatMatch.name === matches[0].name ? (
-                messages.map((message, index) => (
+              {thread.length > 0 ? (
+                thread.map((message, index) => (
                   <div
                     key={`${message.time}-${index}`}
                     className={`message ${message.from}`}
@@ -1129,9 +1222,30 @@ function Matches({
                   <img src={chatMatch.image} alt="" />
                   <h2>Start with what you have in common.</h2>
                   <p>
-                    You both value {chatMatch.tags[0].toLowerCase()}. Say hello
-                    and see if your housing plans align.
+                    {chatMatch.hooks[0]
+                      ? chatMatch.hooks[0].text
+                      : "You two don't overlap much on paper yet — ask about their week."}
                   </p>
+                  {chatMatch.hooks[0] && (
+                    <button
+                      className="outline-button"
+                      onClick={() => {
+                        const hook = chatMatch.hooks[0]
+                        setThreads((prev) => ({
+                          ...prev,
+                          [chatMatch.id]: [
+                            { from: "me", text: reactionLabel("wait"), time: "Now" },
+                            { from: "them", text: hook.reply, time: "Now" },
+                          ],
+                        }))
+                      }}
+                    >
+                      <Icon name="send" size={16} /> “wait, rlly?!”
+                    </button>
+                  )}
+                  <small className="empty-hint">
+                    {openerPrompt(chatMatch.hooks[0] ?? null, chatMatch)}
+                  </small>
                 </div>
               )}
             </div>
@@ -1266,6 +1380,11 @@ function Matches({
                   <b>{selectedFlat.price}</b>
                   <span>/ month</span>
                 </div>
+                <p className="detail-note">
+                  {flatContext
+                    ? `${flatContext.label} · no agency fee on RentMate`
+                    : "District average: not provided."}
+                </p>
                 <button
                   className="tour-button"
                   onClick={() => {
@@ -1394,40 +1513,66 @@ function Matches({
                 <p>{activeMatch.school}</p>
               </div>
               <div className="modal-score">
-                <b>{activeMatch.score}%</b>
+                <b>{scoreLabel(activeMatch.score)}</b>
                 <span>lifestyle match</span>
               </div>
             </div>
             <div className="compatibility-box">
               <p className="section-kicker">Why you match</p>
-              <h3>Your home rhythms naturally align.</h3>
+              <h3>
+                {activeMatch.score === null
+                  ? "Not enough shared answers to score yet."
+                  : `A ${activeMatch.score}% lifestyle fit.`}
+              </h3>
+              {activeMatch.narrative && (
+                <p className="compatibility-narrative">
+                  {activeMatch.narrative}
+                </p>
+              )}
+              {activeMatch.hooks.length > 0 && (
+                <ul className="modal-hooks">
+                  {activeMatch.hooks.map((hook) => (
+                    <li key={hook.id}>{hook.text}</li>
+                  ))}
+                </ul>
+              )}
               <div className="compatibility-bars">
-                {[
-                  ["Daily routine", 96],
-                  ["Communication", 93],
-                  ["Shared spaces", 88],
-                ].map(([label, score]) => (
-                  <div key={label as string}>
-                    <span>
-                      <b>{label}</b>
-                      <small>{score}%</small>
-                    </span>
-                    <i>
-                      <i style={{ width: `${score}%` }} />
-                    </i>
-                  </div>
-                ))}
+                {Object.entries(activeMatch.factors)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([key, value]) => (
+                    <div key={key}>
+                      <span>
+                        <b>{FACTOR_LABELS[key] ?? key}</b>
+                        <small>{Math.round(value * 100)}%</small>
+                      </span>
+                      <i>
+                        <i style={{ width: `${Math.round(value * 100)}%` }} />
+                      </i>
+                    </div>
+                  ))}
               </div>
+              <p className="modal-caveat">
+                A similarity, not a measurement — and the hard filters already
+                ran before this number existed.
+              </p>
             </div>
             <div className="modal-details">
               <span>
-                <small>Preferred area</small>
+                <small>Target area</small>
                 <b>{activeMatch.area}</b>
               </span>
               <span>
                 <small>Monthly budget</small>
                 <b>{activeMatch.budget}</b>
               </span>
+              {commuteNote(activeMatch.area, campusDistrict, commuteLimit) && (
+                <span>
+                  <small>Estimated commute</small>
+                  <b>
+                    {commuteNote(activeMatch.area, campusDistrict, commuteLimit)}
+                  </b>
+                </span>
+              )}
             </div>
             <button
               className="primary-button"
@@ -1784,15 +1929,20 @@ function Matches({
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home")
-  const [email, setEmail] = useState("student@cuhk.edu.hk")
+  const [email, setEmail] = useState(DEMO_EMAIL)
+  const [institution, setInstitution] = useState<Institution | null>(
+    INSTITUTIONS.find((i) => i.domains.includes("cuhk.edu.hk")) ?? null,
+  )
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   if (screen === "home") return <Home onStart={() => setScreen("verify")} />
   if (screen === "verify")
     return (
       <Verify
         onBack={() => setScreen("home")}
-        onVerified={(value) => {
+        onVerified={(value, inst) => {
           setEmail(value)
+          setInstitution(inst)
           setScreen("quiz")
         }}
       />
@@ -1801,8 +1951,22 @@ export default function App() {
     return (
       <Quiz
         onBack={() => setScreen("verify")}
-        onComplete={() => setScreen("matches")}
+        onComplete={(answers) => {
+          const next = answersToProfile(answers, {
+            campusDistrict: institution?.district ?? null,
+          })
+          setProfile(next)
+          void saveProfile(next)
+          setScreen("matches")
+        }}
       />
     )
-  return <Matches email={email} onRestart={() => setScreen("home")} />
+  return (
+    <Matches
+      email={email}
+      institution={institution}
+      profile={profile}
+      onRestart={() => setScreen("home")}
+    />
+  )
 }

@@ -11,7 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
-
+.agents/
+.codebuddy/
+.continue/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
