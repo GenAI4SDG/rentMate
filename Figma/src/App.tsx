@@ -1,7 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react"
 
 import { QUIZ, SECTIONS, answersToProfile } from "./lib/quiz"
-import { CURATED_CAST, DEMO_EMAIL, isCuratedEmail } from "./lib/demoData"
+import { CURATED_CAST, DEMO_EMAIL, isAdminEmail, isCuratedEmail } from "./lib/demoData"
 import { LISTINGS, priceContext } from "./lib/listings"
 import {
   INSTITUTIONS,
@@ -21,12 +21,28 @@ import {
 import {
   backendMode,
   getMatches,
+  getBlocks,
+  getReports,
+  loadAccount,
+  rememberAccount,
   requestVerification,
   saveProfile,
+  sendMessage as sendChatMessage,
+  getHistory,
+  storedEmail,
+  subscribeMessages,
+  reportMessage,
+  blockUser,
+  getBlockedEmails,
+  type BlockRow,
   type MatchFeed,
   type MatchView,
+  type ReportRow,
+  type ChatMessage,
 } from "./lib/api"
 import type { Profile } from "./lib/matching"
+import { SAFETY_NOTES } from "./lib/safetyNotes"
+import { areaGuideFor } from "./lib/areaGuides"
 
 type Screen = "home" | "verify" | "quiz" | "matches"
 
@@ -61,7 +77,7 @@ const EMPTY_MATCH: MatchView = {
   hooks: [],
 }
 
-type Message = { from: "them" | "me"; text: string; time: string }
+type Message = { id?: string; from: "them" | "me"; text: string; time: string }
 
 /**
  * The commute note for a match's target area. Deliberately shows the word
@@ -78,6 +94,13 @@ function commuteNote(
 }
 
 const scoreLabel = (score: number | null) => (score === null ? "—" : `${score}%`)
+
+/** Marks a feature that is AI-generated in production but pre-written in this demo. */
+const GenBadge = ({ label }: { label: string }) => (
+  <span className="gen-demo-badge" title="AI in production; pre-written content in this demo">
+    AI · {label} (demo)
+  </span>
+)
 
 const flats = LISTINGS
 
@@ -263,7 +286,7 @@ function Home({ onStart }: { onStart: () => void }) {
             <span>
               <b>Start matching</b>
               <small>
-                Free · {questions.length} questions · about 4 minutes
+                Free · {questions.length} questions · about 3 minutes
               </small>
             </span>
             <span className="cta-icon">
@@ -585,6 +608,9 @@ function Quiz({
               {index + 1} of {questions.length}
             </span>
           </div>
+          <div className="quiz-progress" aria-hidden="true">
+            <span style={{ width: `${percent}%` }} />
+          </div>
           <p className="question-eyebrow">{question.eyebrow}</p>
           <h1>{question.title}</h1>
           <p className="question-hint">{question.hint}</p>
@@ -798,6 +824,110 @@ function HookCard({
   )
 }
 
+/**
+ * Moderation review — visible ONLY to the `admin@` local part.
+ *
+ * A report that nobody can read is not moderation; it is a write to a table.
+ * This is the minimum surface that makes "report flags admin review" a true
+ * statement: every report, plus every block so ended connections are visible
+ * too. It is a read queue with no action buttons — there is no suspend, no
+ * ban, no resolution state, and this panel does not pretend otherwise.
+ */
+function AdminQueue() {
+  const [reports, setReports] = useState<ReportRow[]>([])
+  const [blocks, setBlocks] = useState<BlockRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [r, b] = await Promise.all([getReports(), getBlocks()])
+      if (cancelled) return
+      setReports(r)
+      setBlocks(b)
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <section className="admin-queue">
+      <h1>Review queue</h1>
+      <p className="admin-lede">
+        Reports and ended connections across every account. Newest first. Nothing
+        here can be actioned from this screen — it is a record, not a moderation
+        console.
+      </p>
+
+      {loading ? (
+        <p className="admin-empty">Loading…</p>
+      ) : (
+        <>
+          <h2>Reports ({reports.length})</h2>
+          {reports.length === 0 ? (
+            <p className="admin-empty">No reports yet.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Reported by</th>
+                  <th>Reported account</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r) => (
+                  <tr key={r.id}>
+                    <td>{new Date(r.created_at).toLocaleString()}</td>
+                    <td>
+                      <code>{r.reporter_email}</code>
+                    </td>
+                    <td>
+                      <code>{r.reported_email}</code>
+                    </td>
+                    <td>{r.reason ?? <em>no reason given</em>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <h2>Ended connections ({blocks.length})</h2>
+          {blocks.length === 0 ? (
+            <p className="admin-empty">No connections have been ended.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Blocked by</th>
+                  <th>Blocked account</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blocks.map((b) => (
+                  <tr key={b.id}>
+                    <td>{new Date(b.created_at).toLocaleString()}</td>
+                    <td>
+                      <code>{b.blocker_email}</code>
+                    </td>
+                    <td>
+                      <code>{b.blocked_email}</code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 function Matches({
   email,
   institution,
@@ -809,7 +939,8 @@ function Matches({
   profile: Profile | null
   onRestart: () => void
 }) {
-  type WorkspaceTab = "matches" | "messages" | "flats"
+  type WorkspaceTab = "matches" | "messages" | "flats" | "review"
+  const isAdmin = isAdminEmail(email)
   const [feed, setFeed] = useState<MatchFeed>({
     matches: [],
     hidden: [],
@@ -825,6 +956,10 @@ function Matches({
   const [tab, setTab] = useState<WorkspaceTab>("matches")
   const [chatId, setChatId] = useState("")
   const [draft, setDraft] = useState("")
+  const [blockedEmails, setBlockedEmails] = useState<string[]>([])
+  const [reportedIds, setReportedIds] = useState<Record<string, boolean>>({})
+  const [viewingOpen, setViewingOpen] = useState(false)
+  const [viewingBooked, setViewingBooked] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [shortlist, setShortlist] = useState<number[]>([1])
   const [selectedFlat, setSelectedFlat] = useState(flats[0])
@@ -858,6 +993,7 @@ function Matches({
   // The verified institution is the commute anchor for every estimate on screen.
   const campusDistrict = institution?.district ?? null
   const commuteLimit = profile?.looking_for?.max_commute_minutes ?? null
+  const areasToShow = (profile?.target_areas ?? []).slice(0, 3)
 
   // Compute the feed once the profile is known. Prefers the Edge Function for the
   // score; lib/api.ts falls back to local scoring, and the hooks are local always.
@@ -888,6 +1024,38 @@ function Matches({
       cancelled = true
     }
   }, [profile, email])
+
+  // Emails I cannot chat with (I blocked them, or they blocked me).
+  useEffect(() => {
+    void getBlockedEmails(email).then((list) => setBlockedEmails(list))
+  }, [email])
+
+  const isBlocked = (match: MatchView) =>
+    Boolean(match.real && match.email && blockedEmails.includes(match.email))
+
+  // Real conversations: load persisted history, then stream live inserts via
+  // Realtime. Optimistic sends and the echo dedupe on the message id.
+  useEffect(() => {
+    const conv = chatMatch?.real ? chatMatch.conversationId : null
+    if (!conv || !chatMatch) return
+    let cancelled = false
+    void getHistory(conv, email).then((hist) => {
+      if (cancelled) return
+      setThreads((prev) => ({ ...prev, [chatMatch.id]: hist }))
+    })
+    const unsubscribe = subscribeMessages(conv, email, (msg) => {
+      if (cancelled) return
+      setThreads((prev) => {
+        const current = prev[chatMatch.id] ?? []
+        if (msg.id && current.some((m) => m.id === msg.id)) return prev
+        return { ...prev, [chatMatch.id]: [...current, msg] }
+      })
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [chatId, chatMatch?.conversationId, email])
 
   // Price context vs the district average (see lib/listings.ts). Null when the
   // district has no figure on file — "not provided" beats a fake comparison.
@@ -923,18 +1091,67 @@ function Matches({
     setTab("messages")
   }
 
-  function sendMessage(event: FormEvent) {
+  async function sendMessage(event: FormEvent) {
     event.preventDefault()
     const text = draft.trim()
     if (!text || !chatMatch.id) return
-    setThreads((prev) => ({
-      ...prev,
-      [chatMatch.id]: [
-        ...(prev[chatMatch.id] ?? []),
-        { from: "me", text, time: "Now" },
-      ],
-    }))
+    if (chatMatch.real && chatMatch.conversationId && !isBlocked(chatMatch)) {
+      const id = await sendChatMessage({
+        conversationId: chatMatch.conversationId,
+        senderEmail: email,
+        text,
+      })
+      setThreads((prev) => ({
+        ...prev,
+        [chatMatch.id]: [...(prev[chatMatch.id] ?? []), { id, from: "me", text, time: "Now" }],
+      }))
+    } else {
+      setThreads((prev) => ({
+        ...prev,
+        [chatMatch.id]: [...(prev[chatMatch.id] ?? []), { from: "me", text, time: "Now" }],
+      }))
+    }
     setDraft("")
+  }
+
+  function reportConnection() {
+    if (!chatMatch.email || !chatMatch.conversationId) return
+    void reportMessage({
+      reporterEmail: email,
+      reportedEmail: chatMatch.email,
+      conversationId: chatMatch.conversationId,
+      reason: "user report from chat",
+    })
+    setReportedIds((prev) => ({ ...prev, [chatMatch.id]: true }))
+  }
+
+  function endConnection() {
+    if (!chatMatch.email) return
+    void blockUser(email, chatMatch.email)
+    setBlockedEmails((prev) =>
+      prev.includes(chatMatch.email as string) ? prev : [...prev, chatMatch.email as string],
+    )
+  }
+
+  function bookViewing(slot: string) {
+    if (!chatMatch.id) return
+    const text = `Let's view this place together — how is ${slot}?`
+    setViewingBooked(slot)
+    setViewingOpen(false)
+    const push = (id?: string) =>
+      setThreads((prev) => ({
+        ...prev,
+        [chatMatch.id]: [...(prev[chatMatch.id] ?? []), { id, from: "me", text, time: "Now" }],
+      }))
+    if (chatMatch.real && chatMatch.conversationId && !isBlocked(chatMatch)) {
+      void sendChatMessage({
+        conversationId: chatMatch.conversationId,
+        senderEmail: email,
+        text,
+      }).then(push)
+    } else {
+      push()
+    }
   }
 
   function toggleShortlist(id: number) {
@@ -1017,13 +1234,28 @@ function Matches({
           >
             <Icon name="home" size={17} /> Find a flat
           </button>
+          {isAdmin && (
+            <button
+              className={tab === "review" ? "active" : ""}
+              onClick={() => setTab("review")}
+            >
+              <Icon name="lock" size={16} /> Review
+            </button>
+          )}
         </nav>
-        <button className="profile-chip" onClick={onRestart}>
+        {/* Identity READOUT, not a control. The Figma export wired this chip to
+            "start over", so a stray click on your own avatar threw away your
+            session and dropped you back at the home screen. Restarting is now
+            an explicit, labelled action. */}
+        <div className="profile-chip">
           <span>{firstName.slice(0, 1).toUpperCase()}</span>
           <span>
             <b>{firstName}</b>
-            <small>Verified student</small>
+            <small>{institution?.name ?? email}</small>
           </span>
+        </div>
+        <button className="start-over" onClick={onRestart}>
+          Start over
         </button>
       </header>
 
@@ -1058,8 +1290,8 @@ function Matches({
                 </b>
                 <span>
                   {backendMode === "supabase"
-                    ? "Scored by the Supabase backend"
-                    : "Demo mode · scored in your browser"}
+                    ? "Supabase connected · chat + profiles persisted · scored in your browser"
+                    : "Demo mode · everything in your browser"}
                   {campusDistrict ? ` · anchored to ${campusDistrict}` : ""}
                 </span>
               </p>
@@ -1152,6 +1384,52 @@ function Matches({
                 </span>
               </p>
             </div>
+            <div className="ai-demo-row">
+              <section className="ai-demo-panel">
+                <h3>
+                  <GenBadge label="neighbourhood guide" />
+                </h3>
+                <p className="ai-demo-lede">
+                  Choose an area by vibe and reputation — in production the intro chat
+                  walks you through this on community sources.
+                </p>
+                {areasToShow.length ? (
+                  areasToShow.map((areaName) => {
+                    const guide = areaGuideFor(areaName)
+                    if (!guide) return null
+                    return (
+                      <div key={areaName} className="area-guide">
+                        <b>{areaName}</b>
+                        <p>{guide.vibe}</p>
+                        <small className="muted">{guide.communityReputation}</small>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="muted">Your target areas will appear here.</p>
+                )}
+              </section>
+              <section className="ai-demo-panel">
+                <h3>
+                  <GenBadge label="listing check" />
+                </h3>
+                <p className="ai-demo-lede">
+                  Before you commit — the red flags a model would catch on any listing or
+                  draft lease.
+                </p>
+                <ul className="safety-list">
+                  {SAFETY_NOTES.map((note) => (
+                    <li key={note.title}>
+                      <b>{note.title}</b>
+                      <span>{note.detail}</span>
+                      {!note.ownerSource && (
+                        <small className="safety-src">Source: {note.source}</small>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
           </section>
         </>
       )}
@@ -1163,7 +1441,7 @@ function Matches({
               <p className="section-kicker">Connections</p>
               <h1>Messages</h1>
             </div>
-            {matches.map((match) => {
+            {matches.filter((m) => !isBlocked(m)).map((match) => {
               const last = threads[match.id]?.[threads[match.id].length - 1]
               return (
                 <button
@@ -1201,10 +1479,58 @@ function Matches({
                   <i /> Connected · {scoreLabel(chatMatch.score)} match
                 </small>
               </span>
+              <span className="chat-actions">
+                <button
+                  className="outline-button"
+                  onClick={() => {
+                    setViewingOpen((open) => !open)
+                    setViewingBooked(null)
+                  }}
+                >
+                  <Icon name="home" size={16} /> Plan a viewing
+                </button>
+                {chatMatch.real && (
+                  <>
+                    <button
+                      className="outline-button"
+                      onClick={reportConnection}
+                      disabled={reportedIds[chatMatch.id]}
+                    >
+                      {reportedIds[chatMatch.id] ? "Reported" : "Report"}
+                    </button>
+                    <button className="outline-button" onClick={endConnection}>
+                      End connection
+                    </button>
+                  </>
+                )}
+              </span>
               <button onClick={() => setTab("flats")}>
                 <Icon name="search" size={16} /> Search flats together
               </button>
             </header>
+            {viewingOpen && (
+              <div className="viewing-panel">
+                <p>
+                  <b>Book a viewing</b> with {chatMatch.name}{" "}
+                  <GenBadge label="scheduler" />
+                </p>
+                <div className="viewing-slots">
+                  {["Sat 10:00", "Sat 14:00", "Sun 11:30", "Weekday 18:00"].map((slot) => (
+                    <button key={slot} className="outline-button" onClick={() => bookViewing(slot)}>
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+                {viewingBooked && (
+                  <p className="viewing-booked">
+                    Requested {viewingBooked} — they'll get a nudge to confirm.
+                  </p>
+                )}
+                <small>
+                  Prototype: this drops a message into the thread; no calendar integration.
+                </small>
+              </div>
+            )}
             <div className="message-stream">
               <div className="conversation-date">Today</div>
               {thread.length > 0 ? (
@@ -1249,16 +1575,23 @@ function Matches({
                 </div>
               )}
             </div>
-            <form className="message-composer" onSubmit={sendMessage}>
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={`Message ${chatMatch.name.split(" ")[0]}...`}
-              />
-              <button disabled={!draft.trim()} aria-label="Send message">
-                <Icon name="send" size={18} />
-              </button>
-            </form>
+            {isBlocked(chatMatch) ? (
+              <div className="connection-ended">
+                You ended this connection — you'll no longer see each other or swap
+                messages.
+              </div>
+            ) : (
+              <form className="message-composer" onSubmit={sendMessage}>
+                <input
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={`Message ${chatMatch.name.split(" ")[0]}...`}
+                />
+                <button disabled={!draft.trim()} aria-label="Send message">
+                  <Icon name="send" size={18} />
+                </button>
+              </form>
+            )}
           </div>
           <aside className="shared-shortlist">
             <div>
@@ -1467,6 +1800,8 @@ function Matches({
         </section>
       )}
 
+      {tab === "review" && isAdmin && <AdminQueue />}
+
       <nav className="mobile-workspace-nav">
         <button
           className={tab === "matches" ? "active" : ""}
@@ -1674,6 +2009,9 @@ function Matches({
                       <span className="room-label living-label">
                         <b>{roomViews[tourRoom].name}</b>
                         <small>{roomViews[tourRoom].dimensions}</small>
+                        <small className="tour-mock-note">
+                          Illustrative mock · not a real 3D scan
+                        </small>
                       </span>
                       <span className="room-label window-label">
                         <b>Ceiling height</b>
@@ -1928,13 +2266,47 @@ function Matches({
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("home")
+  const [screen, setScreen] = useState<Screen | null>(null)
   const [email, setEmail] = useState(DEMO_EMAIL)
   const [institution, setInstitution] = useState<Institution | null>(
     INSTITUTIONS.find((i) => i.domains.includes("cuhk.edu.hk")) ?? null,
   )
   const [profile, setProfile] = useState<Profile | null>(null)
 
+  // Mount reload: restore the account keyed on the last email this browser
+  // used. NO SESSIONS — no token, no cookie, no Auth. If the row is there the
+  // user lands straight in the workspace instead of re-taking the quiz; if it
+  // is not (a first visit, or a cleared browser) they start at Home as before.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const stored = storedEmail()
+      const loaded = stored ? await loadAccount(stored) : null
+      if (cancelled) return
+      if (loaded) {
+        setEmail(loaded.email)
+        setInstitution(
+          loaded.institutionName
+            ? (INSTITUTIONS.find((i) => i.name === loaded.institutionName) ?? null)
+            : null,
+        )
+        setProfile(loaded.profile)
+        setScreen("matches")
+      } else {
+        setScreen("home")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (screen === null)
+    return (
+      <Shell>
+        <p className="boot-note">Loading your account…</p>
+      </Shell>
+    )
   if (screen === "home") return <Home onStart={() => setScreen("verify")} />
   if (screen === "verify")
     return (
@@ -1956,7 +2328,7 @@ export default function App() {
             campusDistrict: institution?.district ?? null,
           })
           setProfile(next)
-          void saveProfile(next)
+          void saveProfile(next, email, institution?.name)
           setScreen("matches")
         }}
       />

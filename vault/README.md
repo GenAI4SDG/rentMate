@@ -15,14 +15,29 @@ removed from this branch (see `NOTES.md` §5); the surviving primary sources are
 
 | Path | What it is |
 |---|---|
-| `ips/IP.rentmate.v2.md` | The intent tree: RentMate's four focuses + the owner's decisions (gender = hard filter, MBTI = scored, 12-question quiz). **approved** (agent) |
-| `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate (gender, smoking) before scoring. **approved** (agent) |
+| `ips/IP.rentmate.v3.md` | **The current intent tree.** RentMate's four focuses, rewritten against the shipped code after the owner's 2026-10-14 decisions (email-as-identity with no Auth and no stored verification; GenAI downgraded to labelled demo content; real in-app chat with moderation; 14-question composite quiz). **approved** (agent) |
+| `ips/IP.rentmate.v2.md` | The previous intent. **Superseded by v3**, kept because v3's diff table is written against it and `NOTES.md` cites it. |
+| `cps/CP.filter_eligible_matches.v1.md` | Hard-constraint gate (gender, belief, area, commute, budget, size, smoking) before scoring. **approved** (agent) |
 | `cps/CP.calculate_match.v2.md` | The deterministic score; **MBTI is a scored factor**, gender is excluded. **approved** (agent) |
 | `cps/CP.validate_institution_email.v1.md` | The university-email access gate. **approved** (agent) |
-| `PG.rentmate.v2.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
+| `PG.rentmate.v3.json` | The Project Graph — the CPs abstracted into facts, **built from disk** by `checks/build_rentmate_pg.py`, never hand-typed |
 | `NOTES.md` | The agent's informal views: the drift it found, what the owner overruled, what the methodology is worth, and what was deleted |
 | `checks/rentmate_reference_impls.py` | Throwaway harness fixtures — **not product code** (the product is TypeScript) |
 | `checks/build_rentmate_pg.py` | The PG builder; reuses `coding_assistant/planning_graph/project_graph.py` |
+| `checks/matching_ts_check.ts` | Runs `Figma/src/lib/matching.ts` against `CP.calculate_match.v2`'s eight oracle cases |
+
+### Why there are three files where there used to be one
+
+The IP moved from v2 to v3 without any contract churn: **all three CPs still
+describe the shipped TypeScript, and the matcher still passes all eight oracle
+cases.** That is the split doing its job — an intent change that would
+otherwise have forced three contract rewrites cost a prose rewrite instead.
+
+The v2 file is kept, not deleted, because v3's "what changed and why" table is
+written against it and `NOTES.md` cites it throughout. If the two ever
+disagree about what the product is, **v3 wins** — that is the whole point of a
+version number.
+
 
 ## The approval criterion that was applied
 
@@ -81,7 +96,7 @@ comment above its `effects` block.
 
 ## The Project Graph, and one real finding about its schema
 
-`PG.rentmate.v2.json` holds three facts (one per CP), built by
+`PG.rentmate.v3.json` holds three facts (one per CP), built by
 `checks/build_rentmate_pg.py` from the CP corpus — never hand-typed, because a
 hand-typed PG could silently disagree with the corpus. It validates **0 hard / 0
 soft**, coverage is **ok**, staleness is **ok**.
@@ -107,14 +122,17 @@ From `coding_assistant/planning_graph/`, with the managed Python 3.13:
 
 ```bash
 V=C:/Users/Trinity/Programmes/GENAI_sdg/vault
-PYTHONPATH=. python ip_tool.py validate "$V/ips/IP.rentmate.v2.md"
+PYTHONPATH=. python ip_tool.py validate "$V/ips/IP.rentmate.v3.md"
 PYTHONPATH=. python cp_tool.py validate "$V"/cps/*.md
 PYTHONPATH=. python ip_tool.py link --ips "$V/ips" --cps "$V/cps"
 PYTHONPATH=".;$V/checks" python g1_harness.py "$V/cps/CP.calculate_match.v2.md" \
     --impl a=rentmate_reference_impls.calculate_match_a \
     --impl b=rentmate_reference_impls.calculate_match_b
 
-# rebuild the Project Graph from the CP corpus (writes PG.rentmate.v2.json)
+# the TypeScript matcher against the same oracle (run from the repo root)
+node --experimental-strip-types "$V/checks/matching_ts_check.ts"
+
+# rebuild the Project Graph from the CP corpus (writes PG.rentmate.v3.json)
 python "$V/checks/build_rentmate_pg.py"
 ```
 

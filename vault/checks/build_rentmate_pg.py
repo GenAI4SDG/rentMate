@@ -1,4 +1,4 @@
-"""Build `PG.rentmate.v1.json` from `vault/cps/` — derived from disk, never hand-typed.
+"""Build `PG.rentmate.v3.json` from `vault/cps/` — derived from disk, never hand-typed.
 
 Mirrors `coding_assistant/planning_graph/build_planner_pg.py`, but for the RentMate
 corpus. Reuses that repo's `project_graph.py` so the fact schema, the coverage check
@@ -21,7 +21,7 @@ import cp_tool                 # noqa: E402
 import project_graph as pg     # noqa: E402
 
 CPS_DIR = VAULT / "cps"
-OUT = VAULT / "PG.rentmate.v2.json"
+OUT = VAULT / "PG.rentmate.v3.json"
 
 # Constraints each CP RETAINS, read off the CP's frontmatter + body. Declared
 # here in one place (never inferred from prose), so the mapping is reviewable.
@@ -89,7 +89,7 @@ def build() -> dict:
                       "reviewed_by_human": False},
         ))
 
-    graph = pg.ProjectGraph(intent_id="IP.rentmate.v2", facts=facts)
+    graph = pg.ProjectGraph(intent_id="IP.rentmate.v3", facts=facts)
 
     # coverage, resolved from the CP corpus the same way ip_tool.link does.
     assign: dict = {}

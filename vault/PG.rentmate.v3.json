@@ -1,6 +1,6 @@
 {
   "schema": "project_graph/v1",
-  "intent_id": "IP.rentmate.v2",
+  "intent_id": "IP.rentmate.v3",
   "coverage_declarations": [],
   "facts": [
     {

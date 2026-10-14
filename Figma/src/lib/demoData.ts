@@ -37,6 +37,12 @@ export type Candidate = {
   replies?: Partial<Record<"wait" | "same" | "more", string>>
   /** A conversation that already exists, so Messages is not empty on arrival. */
   thread?: Array<{ from: "them" | "me"; text: string; time: string }>
+  /** True when this is a real, persisted user rather than a synthetic profile. */
+  real?: boolean
+  /** The other party's email (real only). */
+  email?: string
+  /** Stable conversation id for the email pair (real only). */
+  conversationId?: string
 }
 
 const img = (id: string) =>
@@ -551,4 +557,14 @@ export function isCuratedEmail(email: string): boolean {
 
 export function poolFor(email: string): Candidate[] {
   return isCuratedEmail(email) ? CURATED_CAST : CANDIDATES
+}
+
+/**
+ * True only for the `admin@` local part. Gates the moderation review queue:
+ * a report should be visible to the people expected to act on it, and to
+ * nobody else. Deliberately narrower than `isCuratedEmail` — `demo@` is a
+ * walkthrough account, not a moderator.
+ */
+export function isAdminEmail(email: string): boolean {
+  return (email.split("@")[0] ?? "").trim().toLowerCase() === "admin"
 }

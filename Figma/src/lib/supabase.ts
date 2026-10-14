@@ -1,12 +1,22 @@
 // Supabase client.
 //
+// AUTH MODEL (2026-10-14): the account key is the user's EMAIL, checked
+// client-side against the institution allowlist in lib/institutions.ts. There is
+// NO Supabase Auth here — no sign-up, no password, no OTP, no session — so
+// there is no auth.users and no auth.uid() to key a policy on. RLS is therefore
+// DISABLED on every table in the migration (an enabled policy would block every
+// row). That is a demo-only trade; see `vault/ips/IP.rentmate.v3.md` open
+// question U7 before this schema is pointed at real students.
+//
 // The demo runs with OR WITHOUT a configured project:
-//   - configured   -> Auth (email OTP) + Postgres + the `compatibility` Edge Function
+//   - configured   -> Postgres + Realtime. The score and the narrative are still
+//                     computed locally (lib/matching.ts, lib/hooks.ts); the
+//                     `compatibility` Edge Function is NOT invoked by the app.
 //   - not configured -> everything falls back to local, in-browser behaviour
 //     (see lib/api.ts), so `npm run dev` always shows a working demo.
 //
-// Only the ANON key belongs here. It is public by design (RLS protects the data).
-// The service-role key and the OpenAI key live only in Edge Function secrets.
+// The anon key is public by design, but note that with RLS off it grants full
+// read/write on these tables — fine for synthetic demo data, not for real ones.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 

@@ -22,7 +22,8 @@ Hackathon entry · Track 3: Smart Living, Culture & Belonging · SDG 11
 | If you want to... | Read |
 |---|---|
 | **Know the agreed position** — the team's interim report | [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) |
-| **Know what the product is meant to be** — the validated intent tree | [`vault/ips/IP.rentmate.v2.md`](vault/ips/IP.rentmate.v2.md) |
+| **Know what the product is meant to be** — the validated intent tree | [`vault/ips/IP.rentmate.v3.md`](vault/ips/IP.rentmate.v3.md) |
+| **Know what actually ships vs. what is a demo stub** — the honesty ledger | [`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) §7 |
 | **See the agent's honest take** — the drift found, what was overruled, what was deleted | [`vault/NOTES.md`](vault/NOTES.md) |
 | **See the contracts** (deterministic functions, with test oracles) | [`vault/cps/`](vault/cps/) |
 | **Run the hackathon demo** | [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — start in the **`Figma/`** app |
@@ -34,11 +35,24 @@ Hackathon entry · Track 3: Smart Living, Culture & Belonging · SDG 11
 
 ## Stack
 
-- **Vite + React + TypeScript** ✅ (migrated 24 Sep, typecheck passing 25 Sep)
-- **Supabase** — Auth, Postgres, Edge Functions, pgvector for RAG
-- GenAI calls run in **Supabase Edge Functions** so API keys never reach the client
-- Chat and video are **not built in-house** — the app connects to **Google Meet**
+**What the shipped build actually uses** (as of 14 Oct — see
+[`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) §7 for the full ledger):
+
+- **Vite + React 19 + TypeScript** ✅ typecheck clean, production build green
+- **Supabase — Postgres + Realtime only.** Chat is persisted and delivered live.
+- **No Supabase Auth.** The email is the account key, checked client-side
+  against an institution allowlist. No password, no OTP, no session.
+- **RLS is disabled** on all four tables (no `auth.users` ⇒ no `auth.uid()` to key
+  a policy on). Demo-only trade, documented in `SETUP.md`.
+- **No GenAI API is called anywhere.** Every AI-shaped feature is pre-written
+  content badged "AI · demo" in the UI.
+- **Chat and video are built in-house and stay in-app** — contact details are
+  never exchanged, and there is no Google Meet hand-off.
 - **No deployment needed** — organisers accept localhost
+
+> Earlier revisions of this section described Supabase Auth, Edge-Function
+> GenAI calls and a Google Meet hand-off. None of those ship. They are kept out
+> of the codebase rather than left as aspirational comments.
 
 ## Getting started
 

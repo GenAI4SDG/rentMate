@@ -52,19 +52,69 @@ would keep.
 
 These are the substantive calls that v2 encodes:
 
-- **Gender is a HARD filter.** It gates candidates *before* scoring and never  
-  contributes a number. This overrides both the `site-spec-suite` framing (which  
-  treated a stated gender preference as a filter — consistent, actually) and, more  
-  importantly, v1's blanket claim that "gender cannot influence the score": gender  
-  cannot influence the *score*, but it absolutely can *exclude*. Those are different  
+- **Gender is a HARD filter.** It gates candidates *before* scoring and never
+  contributes a number. This overrides both the `site-spec-suite` framing (which
+  treated a stated gender preference as a filter — consistent, actually) and, more
+  importantly, v1's blanket claim that "gender cannot influence the score": gender
+  cannot influence the *score*, but it absolutely can *exclude*. Those are different
   claims and v1 conflated them.
-- **MBTI is a SOFT scoring preference.** It is one scored factor  
-  (`1 - differing_axes/4`), not a gate and not a label shown to the user. It is best  
-  elicited **through lifestyle questions** rather than asking for a 4-letter code —  
+- **MBTI is a SOFT scoring preference.** It is one scored factor
+  (`1 - differing_axes/4`), not a gate and not a label shown to the user. It is best
+  elicited **through lifestyle questions** rather than asking for a 4-letter code —
   so the quiz does double duty.
-- **12 questions is the demo boundary.** Between "too clunky/slow" and "not thought  
+- **12 questions is the demo boundary.** Between "too clunky/slow" and "not thought
   through enough". The report's spec had 22; the earlier demo had 7.
 - **Don't build on Figma.** The owner would rather the agent not work in `Figma/`.
+
+## 4b. The 2026-10-14 decisions that made it v3
+
+The owner came back with a second batch, and three of them are **downgrades from
+what v2 promised**. Recording them plainly, because the temptation with a
+methodology run is to describe the plan rather than the artifact:
+
+- **Auth is gone entirely.** No Supabase Auth, no password, no OTP. The email is
+  the account key, checked **client-side** against an institution allowlist. The
+  `student_verifications` table that v2's safety node rested on was dropped, so
+  **no verification is stored anywhere** — not even the boolean attestation v2
+  promised. RLS is switched off on every table, because with no `auth.uid()` an
+  enabled policy would block every row. Both facts are declared in the IP as open
+  questions (U7, U8) rather than buried.
+- **The GenAI narrative is not a model.** v2 named GPT-4o-mini as the one GenAI
+  component never to cut. **No model is called anywhere in the shipped app.** The
+  narrative and the neighbourhood guide are pre-written content derived
+  deterministically from the profiles, and the UI badges them "AI · demo". This
+  was a reliability trade the owner accepted knowingly. The honest version of the
+  pitch is "shaped like the real feature, pre-written" — and the IP now says so
+  instead of repeating the promise.
+- **Real chat, with moderation.** In-app only, persisted, over Realtime, with
+  report and block. Contact details are never exchanged anywhere in the product,
+  which is the mechanism that makes "lose contact when the premise of finding a
+  room together is gone" true rather than aspirational.
+
+Two more, both cosmetic-stub decisions: the 3D walkthrough is a flat stock-photo
+drag panorama explicitly labelled "Illustrative mock · not a real 3D scan", and
+the viewing scheduler is four hardcoded slots with a demo badge.
+
+### The quiz drift, found and fixed
+
+The owner's boundary was **12 questions**. The quiz on disk had **20** — and my
+own note from the previous session claimed it had 12, which was simply wrong.
+Fixing it honestly meant reconciling three constraints that do not fit: the
+12-question boundary, all nine eligibility filters (the product's
+differentiator — "we show you who we hid and why"), and all six soft factors plus
+MBTI (the score).
+
+The resolution: **composite questions.** One option now writes concrete 0..1
+values for three soft factors, or fixes two type axes at once, so the matcher's
+input is *unchanged* — all six soft factors, a full four-letter type, all sixteen
+types reachable — while the questionnaire drops from 20 to **14**. Verified
+mechanically rather than assumed: 6/6 soft factors, 4/4 axes, 16/16 types, 16/16
+lifestyle vectors, and all eight oracle cases still pass.
+
+Fourteen is still two over the owner's boundary, and the IP records that as an
+open question (U9) rather than rounding it down to "about twelve". **The one
+thing a methodology run must never do is quietly redefine the owner's number to
+match the artifact.**
 
 ## 5. Why I deleted things, and what survived
 
@@ -97,9 +147,28 @@ plus this run's own superseded `vault/RECONCILIATION.md` and its drift check.
   oracle problem and it is not solved by this run.
 - **Deleting docs is only safe because this is an offshoot.** On `main`, the same  
   action would need the team's sign-off.
+- **Two of my own earlier claims were wrong, and the IP now says so.** My previous
+  session note recorded the quiz as "12 questions"; the file had 20. And v2's
+  safety node promised a stored verification boolean that is not implemented —
+  there is no such column and no Auth to hang one on. Both are corrected in v3
+  rather than left standing. A methodology run that cannot catch its own author's
+  stale claims is not doing the job it claims to do.
+- **The IP is ahead of the contracts on purpose.** v3 describes chat, moderation,
+  the viewing scheduler and the labelled demo content — **none of which has a CP**,
+  because none of them is a deterministic function with an oracle. The IP is
+  therefore asserting intent about behaviour no contract pins. That gap is visible
+  in `ip_tool.py link` as orphans, which is the correct place for it.
 
 ## 7. Open items I am deliberately leaving open
 
+- **U7 — RLS disabled with no Auth.** Every table runs with row level security
+  off, because there is no `auth.uid()` to key a policy on. Anyone with the anon
+  key can read and write every row. Fine for a demo of synthetic data, not fine
+  for real students, and the fix is a real auth model rather than a policy patch.
+- **U8 — the client-side domain gate is not a security control.** It is a UX
+  affordance; any allowlisted address passes, including one that is not the
+  answerer's.
+- **U9 — the quiz is 14, not the owner's 12.** See §4b.
 - **U6 — Figma vs the root app, and the hosting consequence.** The team never  
   concluded this. It matters because the root app is a Vite SPA: presenting it  
   on-screen from a laptop means either `npm run dev` locally or **hosting it**  
@@ -110,3 +179,10 @@ plus this run's own superseded `vault/RECONCILIATION.md` and its drift check.
   wording in `docs/SURVEY.pdf` before either goes on a slide.
 - **`matchedFactors` / `frictionFactors` semantics.** The contracts deliberately do  
   not pin whether "matched" means *agreed* or *considered*. Someone should.
+- **What the pitch may honestly claim.** With no model running and no stored
+  verification, "AI-powered matching" and "verified students" are both false as
+  written. The defensible claims are: a deterministic score you can inspect, seven
+  explicit eligibility filters the user can see working, in-app chat with report
+  and block, and no agency fee. Someone should decide which of those is the
+  headline before the deck is written.
+

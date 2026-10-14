@@ -6,15 +6,22 @@
 //   HARD  (gate before scoring, never scored) → section "nonneg"
 //
 // The hard block exists because the interesting claim is not "we ask 20
-// questions" — everyone asks questions. It is that six of the answers *exclude
+// questions" — everyone asks questions. It is that seven of the answers *exclude
 // people outright*, and the app shows you who it hid and why.
+//
+// Question count: the owner set a short demo questionnaire. All seven
+// eligibility filters are kept (they are the product's differentiator), and the
+// soft block is compressed into composite questions instead — one tap answers
+// several soft factors, or fixes several type axes. Nothing is dropped from the
+// matcher's input: `answersToProfile` still produces every one of the six soft
+// factors and a full four-letter type. See `values` / `letters` on QuizOption.
 //
 // Every hard question has an explicit "no preference" option. Skipping a filter
 // is a legitimate choice, and an unanswered filter must never silently reject.
 //
-// Q1–Q10 are the original thin-slice questions; Q11+ are the hard checks. The
-// old Figma Q7 ("Same gender as me") used to conflate identity with preference —
-// those are split apart on purpose (gender_identity vs gender_preference).
+// The old Figma Q7 ("Same gender as me") used to conflate identity with
+// preference — those are split apart on purpose (gender_identity vs
+// gender_preference).
 
 import { INTEREST_VOCAB } from "./hooks"
 import { TARGET_AREA_OPTIONS, type GenderIdentity, type Profile } from "./matching"
@@ -46,8 +53,12 @@ export type QuizOption = {
   tone?: string
   /** Scale questions: the factor value, 0..1. */
   value?: number
+  /** Composite scale questions: one option can answer SEVERAL soft factors. */
+  values?: Record<string, number>
   /** MBTI questions: the letter this option contributes. */
   letter?: string
+  /** Composite MBTI questions: one option can fix SEVERAL axes at once. */
+  letters?: Record<string, string>
   /** Gender identity. */
   identity?: GenderIdentity
   /** Gender preference. */
@@ -91,148 +102,138 @@ export type QuizQuestion = {
 
 export const QUIZ: QuizQuestion[] = [
   // --- how you live (soft, scored) -----------------------------------------
+  // The owner's demo boundary is a short questionnaire, so the six soft
+  // lifestyle factors are elicited by TWO composite questions instead of six
+  // separate ones. Every option still writes concrete 0..1 values for each of
+  // its factors, so the matcher's input is unchanged — the score is still
+  // factor-by-factor over the same six factors, never an archetype label.
   {
-    id: "sleep",
+    id: "home_rhythm",
     section: "lifestyle",
     eyebrow: "Home rhythms",
-    title: "When does your day usually wind down?",
+    title: "What does an ordinary evening at home feel like?",
     hint: "Think about an ordinary weekday, not your ideal one.",
     kind: "scale",
     factor: "sleep_schedule",
     options: [
-      { title: "Early — lights out before 10", detail: "Mornings are my best hours.", value: 0 },
-      { title: "Around 11", detail: "A steady, mid-paced evening.", value: 0.33 },
-      { title: "After midnight", detail: "I come alive once it's quiet.", value: 0.67 },
-      { title: "It changes every day", detail: "No two nights look the same.", value: 1 },
+      {
+        title: "Lights out early, flat silent",
+        detail: "Before 10. Quiet is the whole point, and I like my own corner.",
+        values: { sleep_schedule: 0, noise_preference: 0, personal_space_preference: 0 },
+      },
+      {
+        title: "Early to bed, door open",
+        detail: "Asleep by 11, but I like knowing there are people about.",
+        values: { sleep_schedule: 0, noise_preference: 0.67, personal_space_preference: 0.67 },
+      },
+      {
+        title: "Up late, headphones on",
+        detail: "The night is mine, but I keep it to myself.",
+        values: { sleep_schedule: 1, noise_preference: 0, personal_space_preference: 0.33 },
+      },
+      {
+        title: "Up late, and loud about it",
+        detail: "Music on past midnight, people in and out, barely a moment alone.",
+        values: { sleep_schedule: 1, noise_preference: 1, personal_space_preference: 1 },
+      },
     ],
   },
   {
-    id: "shared_space",
+    id: "shared_life",
     section: "lifestyle",
     eyebrow: "Shared space",
-    title: "How do shared spaces usually end up?",
+    title: "How does sharing a place actually go for you?",
     hint: "Be honest rather than aspirational.",
     kind: "scale",
     factor: "shared_space_habits",
     options: [
-      { title: "Tidy, reset daily", detail: "Things go back where they live.", value: 0 },
-      { title: "A weekly reset", detail: "Lived-in, but under control.", value: 0.33 },
-      { title: "Organised chaos", detail: "I know where everything is.", value: 0.67 },
-      { title: "I tidy when it bothers me", detail: "Low maintenance by default.", value: 1 },
-    ],
-  },
-  {
-    id: "guests",
-    section: "lifestyle",
-    eyebrow: "Social energy",
-    title: "How often do you have people over?",
-    hint: "Choose what a normal month looks like.",
-    kind: "scale",
-    factor: "social_guest_preference",
-    options: [
-      { title: "Rarely", detail: "Home is where I recharge alone.", value: 0 },
-      { title: "Now and then", detail: "A friend over for dinner.", value: 0.33 },
-      { title: "Most weekends", detail: "I like a full, social flat.", value: 0.67 },
-      { title: "The door is basically open", detail: "People come and go.", value: 1 },
-    ],
-  },
-  {
-    id: "noise",
-    section: "lifestyle",
-    eyebrow: "Atmosphere",
-    title: "What does your ideal home sound like?",
-    hint: "There is no right answer here.",
-    kind: "scale",
-    factor: "noise_preference",
-    options: [
-      { title: "Almost silent", detail: "Quiet is the whole point.", value: 0 },
-      { title: "A quiet hum", detail: "Background music, low voices.", value: 0.33 },
-      { title: "Lively", detail: "Music on, conversation going.", value: 0.67 },
-      { title: "Always something on", detail: "Silence feels strange to me.", value: 1 },
-    ],
-  },
-  {
-    id: "personal_space",
-    section: "lifestyle",
-    eyebrow: "Personal space",
-    title: "How much time to yourself do you need?",
-    hint: "Per day, roughly.",
-    kind: "scale",
-    factor: "personal_space_preference",
-    options: [
-      { title: "A lot — I need my own corner", detail: "Solo time is non-negotiable.", value: 0 },
-      { title: "A decent amount", detail: "An hour or two to reset.", value: 0.33 },
-      { title: "Not much", detail: "I'm happy sharing most of the day.", value: 0.67 },
-      { title: "Almost none", detail: "I'd rather be around people.", value: 1 },
-    ],
-  },
-  {
-    id: "bills",
-    section: "lifestyle",
-    eyebrow: "Shared costs",
-    title: "How should household bills work?",
-    hint: "Groceries, utilities, the small stuff.",
-    kind: "scale",
-    factor: "bill_splitting_style",
-    options: [
-      { title: "Tracked to the cent", detail: "Split exactly what each person used.", value: 0 },
-      { title: "Roughly even", detail: "No spreadsheet needed.", value: 0.33 },
-      { title: "Whoever's around pays", detail: "It evens out eventually.", value: 0.67 },
-      { title: "One shared pot", detail: "We pool money and share everything.", value: 1 },
+      {
+        title: "Tidy, tracked, mostly to myself",
+        detail: "Things go back where they live, and we split what each person used.",
+        values: { shared_space_habits: 0, social_guest_preference: 0, bill_splitting_style: 0 },
+      },
+      {
+        title: "Tidy, but the door is open",
+        detail: "Everything has a place — and the flat is often full of people.",
+        values: { shared_space_habits: 0, social_guest_preference: 0.67, bill_splitting_style: 0.33 },
+      },
+      {
+        title: "Lived-in, and easy about it",
+        detail: "Organised chaos, a friend over now and then, money evens out.",
+        values: { shared_space_habits: 0.67, social_guest_preference: 0.33, bill_splitting_style: 0.67 },
+      },
+      {
+        title: "One shared pot",
+        detail: "We pool money, share the food, and the door stays open.",
+        values: { shared_space_habits: 1, social_guest_preference: 1, bill_splitting_style: 1 },
+      },
     ],
   },
 
   // --- how you think (soft, scored) ----------------------------------------
+  // Two composite questions fix all four axes, so all sixteen types are still
+  // reachable — the type is still worked out from behaviour, never asked for
+  // as a four-letter code.
   {
-    id: "mbti_ei",
+    id: "mbti_energy",
     section: "thinking",
     eyebrow: "Social battery",
-    title: "After a long week, what actually recharges you?",
+    title: "How do you recharge, and how do you plan?",
     hint: "Go with your first instinct.",
     kind: "mbti",
     factor: "mbti_EI",
     options: [
-      { title: "Quiet time on my own", detail: "Solitude refills the tank.", letter: "I" },
-      { title: "Being around people", detail: "Company gives me energy.", letter: "E" },
+      {
+        title: "Alone, with a plan",
+        detail: "Quiet time on my own, and the itinerary is already booked.",
+        letters: { mbti_EI: "I", mbti_SN: "S" },
+      },
+      {
+        title: "Alone, following a hunch",
+        detail: "Solitude refills the tank; the best bits are the unplanned ones.",
+        letters: { mbti_EI: "I", mbti_SN: "N" },
+      },
+      {
+        title: "With people, and a plan",
+        detail: "Company gives me energy, and I like knowing what's happening.",
+        letters: { mbti_EI: "E", mbti_SN: "S" },
+      },
+      {
+        title: "With people, improvising",
+        detail: "Being around people, and deciding more or less day by day.",
+        letters: { mbti_EI: "E", mbti_SN: "N" },
+      },
     ],
   },
   {
-    id: "mbti_sn",
+    id: "mbti_decide",
     section: "thinking",
-    eyebrow: "How you think",
-    title: "Planning a trip, you tend to…",
-    hint: "Pick the one that sounds more like you.",
-    kind: "mbti",
-    factor: "mbti_SN",
-    options: [
-      { title: "Trust the details and the plan", detail: "Booked, mapped, confirmed.", letter: "S" },
-      { title: "Follow a hunch and improvise", detail: "The best bits are unplanned.", letter: "N" },
-    ],
-  },
-  {
-    id: "mbti_tf",
-    section: "thinking",
-    eyebrow: "Conflict style",
-    title: "A flatmate's had a rough day. Your first move?",
+    eyebrow: "Conflict and routine",
+    title: "A flatmate's had a rough day — and what does your week look like?",
     hint: "Your genuine instinct, not the polite answer.",
     kind: "mbti",
     factor: "mbti_TF",
     options: [
-      { title: "Help them work out a fix", detail: "Solve the thing that's wrong.", letter: "T" },
-      { title: "Just be there for them", detail: "The feeling comes first.", letter: "F" },
-    ],
-  },
-  {
-    id: "mbti_jp",
-    section: "thinking",
-    eyebrow: "Daily routine",
-    title: "Your week usually looks…",
-    hint: "Think about how it really goes.",
-    kind: "mbti",
-    factor: "mbti_JP",
-    options: [
-      { title: "Planned in advance", detail: "I like knowing what's coming.", letter: "J" },
-      { title: "Decided day by day", detail: "I keep my options open.", letter: "P" },
+      {
+        title: "Solve it, and plan ahead",
+        detail: "Help them fix what's wrong; the week is mapped out.",
+        letters: { mbti_TF: "T", mbti_JP: "J" },
+      },
+      {
+        title: "Solve it, as it comes",
+        detail: "Work out the fix, then take the rest day by day.",
+        letters: { mbti_TF: "T", mbti_JP: "P" },
+      },
+      {
+        title: "Be there, and plan ahead",
+        detail: "Just be with them first; I like knowing what's coming.",
+        letters: { mbti_TF: "F", mbti_JP: "J" },
+      },
+      {
+        title: "Be there, as it comes",
+        detail: "The feeling comes first, and I keep my options open.",
+        letters: { mbti_TF: "F", mbti_JP: "P" },
+      },
     ],
   },
 
@@ -436,6 +437,19 @@ export function answersToProfile(
       about_me[q.factor] = option.value
     } else if (q.kind === "mbti" && option.letter) {
       letters[q.factor] = option.letter
+    }
+    // Composite questions: one tap answers several soft factors, or fixes
+    // several type axes. `values`/`letters` carry the full set, so a single
+    // question can stand in for many without changing the matcher's input.
+    if (option.values) {
+      for (const [factor, v] of Object.entries(option.values)) {
+        if (typeof v === "number") about_me[factor] = v
+      }
+    }
+    if (option.letters) {
+      for (const [axis, letter] of Object.entries(option.letters)) {
+        letters[axis] = letter
+      }
     }
   })
 
