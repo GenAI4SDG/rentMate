@@ -660,6 +660,17 @@ values
   ('chat-attachments', 'chat-attachments', false, 10485760, array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 on conflict (id) do nothing;
 
+-- Storage policies live on the protected `storage` schema. Drop before create so
+-- a re-run (or a reset-and-apply) does not fail with "policy already exists" (42710).
+drop policy if exists "avatars_public_read"           on storage.objects;
+drop policy if exists "avatars_owner_upload"          on storage.objects;
+drop policy if exists "avatars_owner_update"          on storage.objects;
+drop policy if exists "property_images_public_read"  on storage.objects;
+drop policy if exists "property_images_landlord_upload" on storage.objects;
+drop policy if exists "agreements_owner_all"          on storage.objects;
+drop policy if exists "chat_attachments_participant"  on storage.objects;
+drop policy if exists "chat_attachments_upload"       on storage.objects;
+
 create policy "avatars_public_read"
   on storage.objects for select
   using (bucket_id = 'avatars');

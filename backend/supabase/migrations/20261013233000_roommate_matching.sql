@@ -55,7 +55,11 @@ create trigger roommate_profiles_updated_at
 -- id is CLIENT-generated (uuid) so an optimistic append and the Realtime echo
 -- dedupe on the same id.
 -- ---------------------------------------------------------------------------
-create table if not exists public.messages (
+-- NOTE: the init migration (old auth schema) ALSO creates `public.messages`
+-- with a *different* shape. `create table if not exists` would silently keep the
+-- stale init table, so we drop it first. This is intentional and idempotent.
+drop table if exists public.messages cascade;
+create table public.messages (
   id              uuid primary key,
   conversation_id text not null,
   sender_email    text not null,
@@ -68,7 +72,10 @@ create index if not exists messages_conv_idx
 -- ---------------------------------------------------------------------------
 -- reports — moderation: a user reports another from a conversation
 -- ---------------------------------------------------------------------------
-create table if not exists public.reports (
+-- Same reason as `messages`: the init migration creates `public.reports` with a
+-- different shape. Drop before create so the roommate shape always wins.
+drop table if exists public.reports cascade;
+create table public.reports (
   id              uuid primary key default gen_random_uuid(),
   reporter_email  text not null,
   reported_email  text not null,

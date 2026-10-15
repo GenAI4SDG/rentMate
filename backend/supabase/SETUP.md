@@ -13,7 +13,10 @@ walks through that.
 > an **auth-free** model. There is no Supabase Auth, no password, no OTP, and
 > **row level security is disabled**. The old `student_verifications`,
 > `quiz_answers` and `match_results` tables are gone. If you applied the previous
-> version of this migration, run `supabase db reset` (dev) to re-apply cleanly.
+> version of this migration, point at the **[`reset-and-apply.sql`](reset-and-apply.sql)**
+> one-shot file and run it **once** in the SQL Editor — it drops the stale schema
+> and rebuilds cleanly. (The CLI `supabase db reset` is local-only and cannot
+> reach this project — see the EXISTING-project section.)
 >
 > **Later the same day**, a fourth migration (`20261014150000_rentmate_homes.sql`)
 > added the Homes half: the listing pool moved into the database, and your saved
@@ -28,9 +31,10 @@ walks through that.
 
 ## ⚠️ Read this if you are pointing at an EXISTING project
 
-The linked project is `ghvonvhpcmozpsfzuexo` (**rentMate**). On 2026-10-14 it was
-found to be carrying an **older, auth-based schema**, and the migrations in this
-folder will **not** repair it by themselves. What was measured, with the anon key:
+The live project (check `Figma/.env.local` for the current ref) may be carrying
+an **older, auth-based schema**, and the migrations in this folder will **not**
+repair it by themselves. What was measured on the old `ghvonvhpcmozpsfzuexo`
+project, with the anon key:
 
 | Table | On the live project | What the app needs |
 | --- | --- | --- |
@@ -48,22 +52,49 @@ statement is a **silent no-op** — no error, no warning, and the old
 available: the table exists, the app appears connected, and every write fails on
 a column that isn't there.
 
+**One concrete case that bit us:** `public.messages` and `public.reports` are
+defined by *both* the init migration (old auth shape: `sender_id`, `message_body`
+/ `reporter_id`, `property_id`) **and** the roommate migration (the shape the app
+actually uses: `sender_email`, `body` / `reporter_email`, `reported_email`,
+`conversation_id`). Because init runs first and the roommate versions used `if not
+exists`, the **stale init shape won.** The roommate migration now DROPS and
+recreates those two tables, and `reset-and-apply.sql` is regenerated from it — so a
+clean apply produces the correct columns. (This is exactly the class of drift that
+`npm run smoke` and `check-live-schema.mjs` exist to catch.)
+
 **The fix — one of these, in order of preference:**
 
-1. **Start clean (best for a demo).** Dashboard → Settings → General → *Reset
-   database*, or `supabase db reset` against a linked dev project. Then run all
-   five migrations in order. Nothing on that project is worth keeping — it is
-   demo data.
-2. **Repair in place (keeps nothing, but is explicit).** Drop only the three
-   colliding tables and re-run the migrations:
+1. **One-shot reset file (best, and what your live project needs).** Run
+   [`reset-and-apply.sql`](reset-and-apply.sql) **once** in the SQL Editor
+   (New query → paste → Run). It drops only your `public` schema and the
+   `supabase_migrations` tracking, then rebuilds the full schema from the five
+   migrations in order and grants anon/authenticated access. **No project
+   deletion, no dashboard reset, no CLI, no Docker.** This is the only path that
+   reliably repairs an *existing* project carrying the old schema.
+
+   > **You do NOT delete or reset the project to run this.** The cloud dashboard's
+   > only destructive control is **Delete project** (Settings → General), which
+   > destroys the project URL, anon key and all data and forces a rebuild of
+   > `.env.local` and any deployment — never use it for a schema fix. There is no
+   > "reset schema" button in the main UI; pasting this file into the SQL Editor
+   > *is* the reset. It only touches `public` and `supabase_migrations`; the
+   > protected system schemas (`storage`, `auth`, `realtime`, …) are never touched,
+   > and the project URL / anon key / storage buckets are left untouched.
+2. **Repair in place (explicit, if you'd rather not drop the whole `public`
+   schema).** Drop only the colliding tables and re-run the migrations:
    ```sql
    drop table if exists public.messages cascade;
    drop table if exists public.reports  cascade;
    drop table if exists public.roommate_profiles cascade;
    ```
-   This is **destructive** — it deletes those tables' contents. It is the honest
-   option when you want to be certain the shape matches, rather than trusting a
-   no-op.
+   This is **destructive** — it deletes those tables' contents — but it leaves the
+   rest of `public` (and every system schema) alone. Use it when you want to be
+   certain the shape matches rather than trusting a no-op.
+
+> **`supabase db reset` (the CLI command) is NOT the tool here.** It spins up a
+> *local* Postgres inside Docker and only touches your machine — it cannot reach
+> the linked remote project, and fails outright with no Docker daemon running. Use
+> the file above instead.
 
 Either way, **verify** rather than assume. `backend/scripts/check-live-schema.mjs`
 reads the live project with the anon key and prints exactly the table above for
@@ -110,6 +141,12 @@ The schema is **five** SQL files and they **must** run in order — every later
 migration reuses a helper (`public.set_updated_at()`) that the init migration
 creates.
 
+**Fresh project?** Paste the five files in order below. **Existing project that
+already has data (e.g. the linked `rentMate` project)?** Do **not** paste them
+here — the `if not exists` migrations will silently no-op against the stale
+tables. Use [`reset-and-apply.sql`](reset-and-apply.sql) from the EXISTING-project
+section instead: one paste, full reset + rebuild.
+
 **Easiest path — SQL editor (no CLI needed):**
 1. Dashboard → **SQL Editor** → **New query**.
 2. Open [`backend/supabase/migrations/20260313120000_init_hk_rental_platform.sql`](migrations/20260313120000_init_hk_rental_platform.sql),
@@ -129,6 +166,11 @@ creates.
 supabase link --project-ref <your-project-ref>
 supabase db push
 ```
+> ⚠️ `supabase db push` **alone will not repair an existing project** that already
+> holds the old `roommate_profiles` / `messages`. The `if not exists` migrations
+> no-op against the stale tables, so the columns stay missing and only the writes
+> fail. Run [`reset-and-apply.sql`](reset-and-apply.sql) first (or take the
+> dashboard reset above), so `db push` has a clean slate to apply to.
 
 Then confirm it actually landed — the migration runner's silence is not proof:
 
