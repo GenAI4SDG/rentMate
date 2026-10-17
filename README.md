@@ -26,7 +26,7 @@ Two documents. Everything else is reference.
 
 **Reading order for a new teammate:** `PRD.md` §1–5 → `TEAM-BRIEF.md` §4 (your job) → `TEAM-BRIEF.md` §6 (setup). That is all you need to start.
 
-**Run the hackathon demo (judges / localhost):** [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — start in the **`Figma/`** app (`cd Figma && npm install && npm run dev`).
+**Run the hackathon demo (judges / localhost):** [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — setup, env, map API, demo script, backend checks.
 
 **Key dates:** build + submission both **~18 October** · **code freeze 14 October**.
 
