@@ -1,93 +1,128 @@
-# RentMate (GENAI_sdg)
+# RentMate
 
-**Roommate matching and affordable housing for students in Hong Kong** — helping non-local students settle in quickly, with compatible roommates and no agency fee worth a month's rent.
+**Roommate matching and affordable housing for students in Hong Kong** — compatible flatmates, transparent listings, and a trust layer so newcomers avoid agency fees and scam-heavy channels.
 
-Hackathon entry · Track 3: Smart Living, Culture & Belonging · SDG 11
-
-> ### ⚠️ The interim report is authoritative
-> **`docs/GENAI SDG interim draft.pdf`** is the team-agreed statement of this project. Where any markdown file disagrees with it, the interim report wins. Change log: `docs/interim-report-reconciliation.md`.
-
----
-
-## Start here
-
-Two documents. Everything else is reference.
-
-| If you want to... | Read |
+| | |
 |---|---|
-| **Know the agreed position** — the team's interim report, which outranks everything else here | [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) |
-| **See what changed** when the md files were reconciled to it | [`docs/interim-report-reconciliation.md`](docs/interim-report-reconciliation.md) |
-| **Understand the product** — what we're building, for whom, what's in and out of scope, the GenAI split, the ethics rules | [`PRD.md`](PRD.md) |
-| **Know what to do next** — decisions already made, what's still open, your job, the calendar, setup | [`TEAM-BRIEF.md`](TEAM-BRIEF.md) |
-| See the full market research with sources | [`docs/hk-rental-partner-research.html`](docs/hk-rental-partner-research.html) |
-| See the judging scorecard and demo narrative | [`docs/rentmate-scope-lock.html`](docs/rentmate-scope-lock.html) |
-| See the longer-term strategy routes | [`docs/rentmate-implementation-methods.html`](docs/rentmate-implementation-methods.html) |
-| Read the original deck and raw survey | [`docs/GenAI.pdf`](docs/GenAI.pdf) · [`docs/SURVEY.pdf`](docs/SURVEY.pdf) |
+| **Hackathon** | GENAI for SDG · **Track 3 — Smart Living, Culture & Belonging** |
+| **SDG** | **11** — Sustainable cities and communities |
+| **Status** | **Entry granted** · demo-ready build on `main` (localhost accepted by organisers) |
+| **Team repo** | [GenAI4SDG/rentMate](https://github.com/GenAI4SDG/rentMate) |
 
-**Reading order for a new teammate:** `PRD.md` §1–5 → `TEAM-BRIEF.md` §4 (your job) → `TEAM-BRIEF.md` §6 (setup). That is all you need to start.
+**Four focuses (pitch order):** compatibility → affordability → transparency → safety (university-gated access).
 
-**Run the hackathon demo (judges / localhost):** [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — setup, env, map API, demo script, backend checks.
-
-**Key dates:** build + submission both **~18 October** · **code freeze 14 October**.
+Product authority for scope and ethics: [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) · details in [`PRD.md`](PRD.md).
 
 ---
 
-## Stack
+## What works today
 
-- **Vite + React + TypeScript** ✅ (migrated 24 Sep, typecheck passing 25 Sep)
-- **Supabase** — Auth, Postgres, Edge Functions, pgvector for RAG
-- GenAI calls run in **Supabase Edge Functions** so API keys never reach the client
-- Chat and video are **not built in-house** — the app connects to **Google Meet**, with photo galleries and pre-recorded video walkthrough requests as alternatives
-- **No deployment needed** — organisers accept localhost
+The **main demo** lives in **`Figma/`** (React 19 + Vite, port **8443**). It serves **two audiences**:
 
-## Getting started
+- **Student tenants** — verify email (demo gate) → lifestyle quiz → seeded roommate matches → messages → **Find a flat** on an OpenStreetMap.
+- **Landlords / flat owners** — demo sign-in (account **testing**) → dashboard to **add listings** and manage pins on the same map.
 
-**Demo UI (recommended):**
+**`backend/`** — Supabase Postgres (HK rental schema, RLS), **map API** (`backend/server`, port **3001**), and **Edge Function stubs** for a future rental chatbot and agreement review. With env + seed, the map shows **50 Hong Kong listings**; the home page can load **12 amenities** live from Supabase.
+
+Root **`src/`** is a thin shell for later merge of the Figma UI — not the judge path.
+
+---
+
+## Feature checklist (planned vs built)
+
+Aligned to [`docs/pitch-and-data-pack.md`](docs/pitch-and-data-pack.md) §1.1. Legend: ✅ demo-ready · 🟡 partial / prototype · ⬜ not wired in app yet.
+
+| ID | Feature | Status | Notes |
+|----|---------|--------|--------|
+| **F1** | Student verification (university email) | 🟡 | Domain check + session in browser; **not** Supabase Auth / mailbox proof |
+| **F2** | Lifestyle + housing quiz | ✅ | 7-question flow in `Figma/src/App.tsx` |
+| **F3** | Roommate matching + **compatibility narrative** | 🟡 | Seeded profiles + static compatibility bars; **no live GPT-4o-mini narrative** in UI yet |
+| **F4** | Listing layer + neighbourhood transparency | 🟡 | **Real** map listings (GeoJSON, bbox, geocode, nearby POIs); mock 3D tour; no R&VD price brief / in-app chatbot yet |
+| **F4+** | Landlord list & manage on map | ✅ | Entry path + `ListingFormModal` + seed user **testing** (hackathon extension) |
+| **F5** | Chat + video | 🟡 | In-app **demo** messaging; **Google Meet** handoff not linked |
+| **F6** | Extended flat-viewing meetup | ⬜ | Community beat not implemented as its own flow |
+| **F7** | Generated settling-in plan | ⬜ | Not in UI |
+| **F8** | Multilingual layer | 🟡 | DB amenities EN/中文; UI mostly English |
+| — | **Supabase schema + RLS** | ✅ | Migrations under `backend/supabase/migrations/` |
+| — | **GenAI rental chatbot** | 🟡 | Edge Function stub; needs deploy + `OPENAI_API_KEY` + UI hookup |
+| — | **Agreement AI review** | 🟡 | Edge Function stub only |
+| — | **Roommate data in Postgres** | ⬜ | Quiz/matches still client demo data, not HK rental tables |
+
+**Demo honesty:** Say aloud that **roommate profiles are seeded**; **map listings** are real when the map API is running and seed has been applied.
+
+---
+
+## Quick start
+
+### Judges / teammates (UI only)
 
 ```bash
 cd Figma
 npm install
 npm run dev
+# → http://localhost:8443
 ```
 
-**Root app shell (integration work in progress):**
+Optional: `Figma/.env.local` from `Figma/.env.example` for the **Live database check** on the home page.
+
+### Full stack (map + 50 HK pins)
+
+See **[`docs/demo-user-guide.md`](docs/demo-user-guide.md)** — env files, `supabase db push`, map API, `npm run seed:listings`, landlord **testing**.
 
 ```bash
-npm install
-npm run dev
+# Terminal 1
+cd backend/server && npm install && npm run dev
+
+# Terminal 2
+cd Figma && npm run dev
 ```
 
-**Supabase backend:** see [`backend/README.md`](backend/README.md) and [`docs/demo-user-guide.md`](docs/demo-user-guide.md).
+---
 
-## Checks — run these before every commit
+## Stack
+
+| Layer | Choice |
+|-------|--------|
+| Frontend | Vite 8, React 19, TypeScript (`Figma/`) |
+| Backend | Supabase (Auth, Postgres, Storage, Edge Functions) |
+| Map | Leaflet, OSM tiles, Express map API, Nominatim / Overpass |
+| GenAI (target) | GPT-4o-mini in Edge Functions — compatibility narrative + grounded chatbot (keys server-side only) |
+| Demo | **localhost** (organiser-confirmed); no deploy required |
+
+---
+
+## Repository map
+
+| Path | Role |
+|------|------|
+| [`Figma/`](Figma/) | Hackathon demo UI |
+| [`backend/supabase/`](backend/supabase/) | Migrations, Edge Functions |
+| [`backend/server/`](backend/server/) | Map API, geocode, listing CRUD, seed scripts |
+| [`docs/demo-user-guide.md`](docs/demo-user-guide.md) | Setup, troubleshooting, demo script |
+| [`backend/README.md`](backend/README.md) | Supabase + map API reference |
+| [`TEAM-BRIEF.md`](TEAM-BRIEF.md) | Decisions, roles, calendar |
+| [`PRD.md`](PRD.md) | Full product requirements |
+
+---
+
+## Development
 
 ```bash
-npm run typecheck   # tsc --noEmit — the important one
-npm run lint
-npm run build       # before each Friday demo
+# Figma app
+cd Figma && npm run build
+
+# Map API tests
+cd backend/server && npm test
 ```
 
-> **Vite does not typecheck.** `npm run dev` will happily serve code with type errors. Without `npm run typecheck` the editor is your only safety net and broken code reaches `main`.
+Before sharing `main`: run `npm run build` in `Figma/` (Vite does not typecheck on `dev`).
 
-## Working on this repo with WorkBuddy
+**Secrets:** only `*.env.example` is committed — copy to `.env.local`. Never commit keys.
 
-This repo carries its own AI context. Open the repo folder in WorkBuddy and your session inherits it automatically:
+**Branching:** `main` stays demo-able · one person per file · remote `GenAI4SDG/rentMate`.
 
-- **`.workbuddy-ai/memory/MEMORY.md`** — the shared project brain. Update it when you *decide* something, not just when you build something.
-- **`.workbuddy-ai/skills/rentmate-conventions/`** — our stack, conventions, ethics rules and scope lock. Auto-loads, so every teammate's assistant gives the same answers.
+---
 
-> ⚠️ Do not delete `.workbuddy-ai/`. It is project data, not a cache. It **is** committed to git (see `.gitignore`).
+## Reference (optional)
 
-## Branching
-
-Remote: `https://github.com/GenAI4SDG/rentMate`
-
-- `main` must always be demo-able
-- **One branch per person:** `p1/`, `p2/`, `p3/`
-- **One person per file** — AI tools edit files directly, so two people on one file collide
-- Tag a working demo every Friday: `git tag demo-w1`
-- `.env.example` is committed; `.env` is not
-
-## Organiser questions
-
-All ten were answered on 24 September — full table in [`TEAM-BRIEF.md`](TEAM-BRIEF.md) §3. Only the pitch-deck and interim-report requirements are still outstanding.
+Market research, judging scorecard, build plans: `docs/*.html`, [`docs/build-plans.md`](docs/build-plans.md), [`docs/pitch-and-data-pack.md`](docs/pitch-and-data-pack.md). Site spec draft: `docs/site-spec-suite/`.
