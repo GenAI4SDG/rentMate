@@ -173,6 +173,7 @@ git add -A && git commit -m "Describe the change" && git push origin main
 | Map works locally, empty online | Set **`VITE_MAP_API_URL`** at **build** time; redeploy the website |
 | Browser console: CORS error online | `CORS_ORIGINS` must exactly match the website origin (no trailing slash) |
 | First map load online is slow | Render free tier was asleep — open it a minute before presenting |
+| Build OK but **Exited with status 1** / `Missing Supabase credentials` | Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` on the **Render API** service → Environment → Save → redeploy |
 | Red squiggles on `.sql` files | Disable the **SQL Server (mssql)** extension for this workspace |
 
 ---

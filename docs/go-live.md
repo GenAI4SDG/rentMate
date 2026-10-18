@@ -53,7 +53,10 @@ No need to finish those for entry — focus on a stable public URL and a clear 3
 | Start | `npm start` |
 | Health check | `/api/health` |
 
-**Environment variables** (paste from your local `backend/server/.env.local` — never commit that file):
+**Environment variables** — Render does **not** read your laptop’s `.env.local`. You must add these in the dashboard **before** the service can start:
+
+1. Render → your **map API** service → **Environment** (left sidebar).
+2. **Add Environment Variable** for each row below (copy values from local `backend/server/.env.local` or Supabase → Settings → API):
 
 | Name | Notes |
 |------|--------|
@@ -62,7 +65,11 @@ No need to finish those for entry — focus on a stable public URL and a clear 3
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role `eyJ…` or `sb_secret_…` |
 | `OSM_USER_AGENT` | e.g. `RentMate/1.0 (you@email.com)` |
 
-Save → wait for deploy → open `https://YOUR-SERVICE.onrender.com/api/health` → expect `"ok": true`.
+3. **Save Changes** → Render redeploys automatically (or use **Manual Deploy**).
+
+If the build succeeds but logs show `Missing Supabase credentials`, you skipped this step or used the wrong service (env vars must be on the **API** service, not only the static site).
+
+Open `https://YOUR-SERVICE.onrender.com/api/health` → expect `"ok": true`.
 
 **Shortcut:** Render → *New → Blueprint* → select repo → use root [`render.yaml`](../render.yaml) (creates API + static site together; you still fill secrets in the dashboard).
 
