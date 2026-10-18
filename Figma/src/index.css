@@ -1648,6 +1648,106 @@ a { color: inherit; text-decoration: none; }
 .my-listing-actions button.danger:hover:not(:disabled) { border-color: #b64d3d; color: #b64d3d; }
 .my-listing-actions button:disabled { opacity: .5; cursor: default; }
 
+/* ---------- Owner dashboard: mockup guide, verification, amenities ---------- */
+/* Every mockup surface wears the same dashed amber pill (ui/MockupBadge). */
+.mockup-badge { display: inline-flex; align-items: center; padding: 3px 9px; border: 1px dashed #c9a23f; border-radius: 99px; background: #fbf3dd; color: #6f5410; font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+.owner-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 14px 5vw 22px; align-items: start; }
+.owner-panel { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+.owner-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.owner-panel-head h2 { margin: 0; font: 500 24px "Playfair Display", serif; }
+.owner-panel-head h3 { margin: 0; font-size: 14px; }
+.owner-panel-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+.walkthrough { display: grid; gap: 12px; margin: 0 0 18px; padding: 0; list-style: none; }
+.walkthrough li { display: flex; gap: 12px; align-items: flex-start; }
+.walkthrough-num { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--terracotta); color: #fff; font-size: 12px; font-weight: 700; }
+.walkthrough b { display: block; font-size: 13.5px; }
+.walkthrough small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.agency-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.agency-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.agency-links li { display: flex; align-items: center; gap: 10px; }
+.agency-links a { flex: 1; min-width: 0; display: grid; gap: 1px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-decoration: none; transition: border-color .15s; }
+.agency-links a:hover { border-color: var(--terracotta); }
+.agency-links b { font-size: 13px; }
+.agency-links small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.agency-links svg { flex: none; color: var(--terracotta); }
+
+.verify-steps { display: grid; gap: 10px; margin: 0 0 16px; padding: 0; list-style: none; }
+.verify-steps li { display: flex; gap: 10px; align-items: center; }
+.verify-step-dot { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--muted); font-size: 11px; font-weight: 700; }
+.verify-steps li.done .verify-step-dot { border-color: #cddcc6; background: #e9efe3; color: #46683f; }
+.verify-steps b { display: block; font-size: 13px; }
+.verify-steps small { color: var(--muted); font-size: 11.5px; }
+
+.verify-block { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.verify-block h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 13px; }
+.verify-block h3 svg { color: var(--terracotta); }
+.verify-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+/* ID dropzone: a real file input, visually hidden but focusable; the label
+   is the click target and says plainly that nothing is uploaded. */
+.id-dropzone { display: grid; justify-items: center; gap: 4px; margin-bottom: 10px; padding: 20px 14px; border: 1.5px dashed #d8cfc0; border-radius: 12px; background: #fbf8f2; text-align: center; cursor: pointer; transition: border-color .15s; }
+.id-dropzone:hover { border-color: var(--terracotta); }
+.id-dropzone:focus-within { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(201,107,72,.12); }
+.id-dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.id-dropzone svg { color: var(--terracotta); }
+.id-dropzone b { font-size: 13px; }
+.id-dropzone small { color: var(--muted); font-size: 11px; }
+
+.mock-result { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fbf8f2; }
+.mock-result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; }
+.mock-result ul { display: grid; gap: 5px; margin: 0 0 10px; padding: 0; list-style: none; }
+.mock-result li { position: relative; padding-left: 15px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.mock-result li::before { content: "·"; position: absolute; left: 4px; color: var(--terracotta); font-weight: 800; }
+
+/* Phone-camera room scan: a mock viewfinder. There is deliberately NO
+   getUserMedia call anywhere — a real permission prompt mid-demo is worse
+   than a clearly-labelled simulation. */
+.scan-stage { display: grid; gap: 10px; }
+.scan-viewfinder { position: relative; height: 170px; border-radius: 12px; background: linear-gradient(160deg, #3a3733, #23211f); overflow: hidden; }
+.scan-corner { position: absolute; width: 22px; height: 22px; border: 2px solid rgba(255,255,255,.85); }
+.scan-corner.tl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+.scan-corner.tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+.scan-corner.bl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+.scan-corner.br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+.scan-line { position: absolute; left: 12px; right: 12px; height: 2px; background: linear-gradient(90deg, transparent, var(--terracotta), transparent); animation: scan-sweep 2.2s ease-in-out infinite; }
+@keyframes scan-sweep { 0%, 100% { top: 18px; } 50% { top: calc(100% - 20px); } }
+.scan-room-label { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 4px 10px; border-radius: 99px; background: rgba(0,0,0,.55); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.scan-hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+
+.validity-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.validity-row span { color: var(--muted); font-size: 12px; }
+.validity-row .outline-button { width: auto; min-height: 38px; padding: 0 14px; font-size: 12px; }
+
+.listing-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.verify-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+.verify-pill.unverified { background: #ececea; color: #6c6d68; }
+.verify-pill.verified { background: #e4f1e6; color: #2f6b3c; }
+
+/* Amenity picker in the listing form — scoped under the modal so the
+   modal's generic `label { display:block }` rule cannot flatten it. */
+.listing-form-modal .amenity-picker { margin: 14px 0 4px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fbf8f2; }
+.listing-form-modal .amenity-picker legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 6px; font-size: 13px; font-weight: 700; }
+.listing-form-modal .amenity-note { display: block; margin: 4px 0 12px; color: var(--muted); font-size: 11.5px; font-weight: 400; line-height: 1.55; }
+.listing-form-modal .amenity-group + .amenity-group { margin-top: 12px; }
+.listing-form-modal .amenity-group > b { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.amenity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.listing-form-modal .amenity-check { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; transition: border-color .15s; }
+.amenity-check:hover { border-color: var(--terracotta); }
+.amenity-check.checked { border-color: #cddcc6; background: #f4f8f1; }
+.amenity-check input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.amenity-tick { width: 17px; height: 17px; flex: none; display: grid; place-items: center; border: 1px solid #cfc9bf; border-radius: 5px; background: #fff; color: #fff; }
+.amenity-check.checked .amenity-tick { border-color: #46683f; background: #46683f; }
+.amenity-copy { display: grid; min-width: 0; }
+.amenity-copy b { font-size: 12px; font-weight: 600; }
+.amenity-copy small { color: var(--muted); font-size: 10.5px; }
+.amenity-count { margin: 10px 0 0; color: var(--muted); font-size: 11.5px; }
+
+@media (max-width: 900px) {
+  .owner-panels { grid-template-columns: 1fr; }
+}
+
 /* ---------- Price context ---------- */
 .price-context { display: grid; gap: 3px; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #f4f1ea; font-size: 13px; }
 .price-context small { color: var(--muted); font-size: 11px; line-height: 1.45; }
@@ -1726,6 +1826,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 760px) {
   .my-listing { grid-template-columns: 1fr auto; }
   .my-listing-actions { grid-column: 1 / -1; }
+  .listing-pills { grid-column: 1 / -1; }
   .narrative-cols { grid-template-columns: 1fr; }
   .narrative-starters { grid-template-columns: 1fr; }
   .rent-bot-launcher { bottom: 78px; left: 14px; }

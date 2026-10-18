@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react"
 import { mapApiUrl } from "../lib/api-base"
 import { createListing } from "../lib/landlordApi"
+import Icon from "./ui/Icon"
+import MockupBadge from "./ui/MockupBadge"
 
 const DISTRICTS = [
   "Central & Western",
@@ -29,6 +31,60 @@ const PROPERTY_TYPES = [
   { value: "studio", label: "Studio" },
 ]
 
+/**
+ * Amenity checklist — MOCKUP.
+ *
+ * The first twelve are the exact rows seeded into `public.amenities`
+ * (backend/supabase/migrations/20260313120001_seed_amenities.sql, EN + 中文).
+ * The last three (washing machine, equipped kitchen, good view) are the
+ * owner-requested extras and are NOT in the database yet.
+ *
+ * None of them reach the backend: POST /api/listings validates a fixed body
+ * (see backend/server/src/routes/listings.ts) and never writes
+ * `property_amenities`, so the selections below are local preview state and
+ * the UI says so. Wiring them is: extend the route's zod schema + insert the
+ * join rows after the property insert.
+ */
+const AMENITY_GROUPS: { group: string; items: { en: string; zh: string }[] }[] = [
+  {
+    group: "Washroom",
+    items: [
+      { en: "Separate bathroom", zh: "獨立浴室" },
+      { en: "Washing machine", zh: "洗衣機" },
+    ],
+  },
+  {
+    group: "Kitchen",
+    items: [
+      { en: "Cooking allowed", zh: "可煮食" },
+      { en: "Fully equipped kitchen", zh: "設備齊全廚房" },
+    ],
+  },
+  {
+    group: "View & light",
+    items: [
+      { en: "Window in room", zh: "房內有窗" },
+      { en: "Good view", zh: "景觀開揚" },
+      { en: "Balcony", zh: "露台" },
+    ],
+  },
+  {
+    group: "Comfort & building",
+    items: [
+      { en: "Air conditioning", zh: "冷氣" },
+      { en: "Wi-Fi included", zh: "包 Wi-Fi" },
+      { en: "Near MTR", zh: "近港鐵" },
+      { en: "Furnished", zh: "連傢俬" },
+      { en: "Elevator", zh: "升降機" },
+      { en: "24h security", zh: "24 小時保安" },
+      { en: "Gym in building", zh: "會所健身室" },
+      { en: "Pet friendly", zh: "可養寵物" },
+    ],
+  },
+]
+
+const ALL_AMENITIES = AMENITY_GROUPS.flatMap((g) => g.items.map((i) => i.en))
+
 export default function ListingFormModal({
   onClose,
   onCreated,
@@ -50,6 +106,15 @@ export default function ListingFormModal({
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [amenities, setAmenities] = useState<string[]>([])
+
+  function toggleAmenity(name: string) {
+    setAmenities((current) =>
+      current.includes(name)
+        ? current.filter((x) => x !== name)
+        : [...current, name],
+    )
+  }
 
   async function pinAddress() {
     setError(false)
@@ -206,6 +271,53 @@ export default function ListingFormModal({
             />
           </label>
         </div>
+
+        <fieldset className="amenity-picker">
+          <legend>
+            Amenities & features{" "}
+            <MockupBadge label="Preview — not saved yet" />
+          </legend>
+          <p className="amenity-note">
+            Tick what the flat has — washroom, kitchen, view, building extras.
+            Bilingual names match the amenity table in the database, but the
+            publish API does not accept them yet, so these ticks stay in this
+            form and are not saved with the listing.
+          </p>
+          {AMENITY_GROUPS.map((section) => (
+            <div key={section.group} className="amenity-group">
+              <b>{section.group}</b>
+              <div className="amenity-grid">
+                {section.items.map((item) => {
+                  const checked = amenities.includes(item.en)
+                  return (
+                    <label
+                      key={item.en}
+                      className={`amenity-check ${checked ? "checked" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAmenity(item.en)}
+                      />
+                      <span className="amenity-tick" aria-hidden="true">
+                        {checked ? <Icon name="check" size={12} /> : null}
+                      </span>
+                      <span className="amenity-copy">
+                        <b>{item.en}</b>
+                        <small lang="zh-Hant">{item.zh}</small>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+          <p className="amenity-count">
+            {amenities.length === 0
+              ? "None ticked yet"
+              : `${amenities.length} of ${ALL_AMENITIES.length} ticked`}
+          </p>
+        </fieldset>
 
         {message && (
           <p className={`field-message ${error ? "error" : ""}`}>{message}</p>

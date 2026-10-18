@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
 import FlatsMapExplorer from "./FlatsMapExplorer"
 import ListingFormModal from "./ListingFormModal"
+import OwnerGuide from "./OwnerGuide"
+import OwnerVerification from "./OwnerVerification"
+import Icon from "./ui/Icon"
 import { getDisplayName, getStoredEmail } from "../lib/demo-session"
 import {
   fetchOwnListingsResult,
@@ -29,6 +32,13 @@ export default function LandlordDashboard({
   const [mapVersion, setMapVersion] = useState(0)
   /** True when the listings on screen are the synthetic pool, not live data. */
   const [demoMode, setDemoMode] = useState(false)
+  /**
+   * Mockup verification flags — in memory on purpose: reload and you are
+   * unverified again, which is the honest shape for a demo affordance.
+   * OwnerVerification sets them; the listing table reads them for its pill.
+   */
+  const [idVerified, setIdVerified] = useState(false)
+  const [roomScanned, setRoomScanned] = useState(false)
 
   const name = getDisplayName() || "owner"
   const email = getStoredEmail()
@@ -125,6 +135,16 @@ export default function LandlordDashboard({
         </p>
       ) : null}
 
+      <div className="owner-panels">
+        <OwnerGuide />
+        <OwnerVerification
+          idVerified={idVerified}
+          onIdChange={setIdVerified}
+          roomScanned={roomScanned}
+          onScanChange={setRoomScanned}
+        />
+      </div>
+
       <section className="my-listings">
         <div className="my-listings-head">
           <h2>My listings</h2>
@@ -158,9 +178,22 @@ export default function LandlordDashboard({
                   </small>
                 </div>
                 <strong>HK${l.price.toLocaleString()}</strong>
-                <span className={`status-pill ${l.status}`}>
-                  {STATUS_LABEL[l.status]}
-                </span>
+                <div className="listing-pills">
+                  <span className={`status-pill ${l.status}`}>
+                    {STATUS_LABEL[l.status]}
+                  </span>
+                  <span
+                    className={`verify-pill ${idVerified ? "verified" : "unverified"}`}
+                    title="Mockup — no document is ever checked; see Get verified"
+                  >
+                    {idVerified ? (
+                      <Icon name="check" size={11} />
+                    ) : (
+                      <Icon name="lock" size={11} />
+                    )}
+                    {idVerified ? "Verified owner" : "Unverified"}
+                  </span>
+                </div>
                 <div className="my-listing-actions">
                   {l.status !== "available" && (
                     <button
