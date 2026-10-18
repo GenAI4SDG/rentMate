@@ -83,8 +83,41 @@ import {
   loadRemotePersonal,
   saveRemotePersonal,
 } from "./lib/homesApi"
+import { FormEvent, ReactNode, useMemo, useRef, useState } from "react"
+import {
+  clearDemoSession,
+  getQuizAnswers,
+  getStoredEmail,
+  getUserRole,
+  isOnboarded,
+  isValidDemoEmail,
+  setOnboardedComplete,
+  setQuizAnswers,
+  setStoredEmail,
+  setUserRole,
+} from "./lib/demo-session"
+import BackendHealthCheck from "./components/BackendHealthCheck"
+import FlatsMapExplorer from "./components/FlatsMapExplorer"
+import LandlordDashboard from "./components/LandlordDashboard"
+import LandlordEntry from "./components/LandlordEntry"
+import MatchNarrative from "./components/MatchNarrative"
+import RentChatbot from "./components/RentChatbot"
+import SettlingPlan from "./components/SettlingPlan"
 
-type Screen = "home" | "verify" | "quiz" | "matches"
+type Screen =
+  | "home"
+  | "verify"
+  | "quiz"
+  | "matches"
+  | "landlord-entry"
+  | "landlord-dashboard"
+
+type Question = {
+  eyebrow: string
+  title: string
+  hint: string
+  options: { title: string; detail?: string; tone?: string }[]
+}
 
 const heroImage =
   "https://images.unsplash.com/photo-1562755484-8225ee5215ae?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=88&w=1600"
@@ -235,11 +268,23 @@ function Icon({
   size = 20,
   strokeWidth = 1.8,
 }: {
-  name: "arrow" | "back" | "check" | "home" | "lock" | "mail" | "spark" | "user" | "heart" | "chat" | "search" | "send"
+  name: "arrow" | "back" | "check" | "home" | "lock" | "mail" | "spark" | "user" | "heart" | "chat" | "search" | "send" | "video" | "list"
   size?: number
   strokeWidth?: number
 }) {
   const paths: Record<string, ReactNode> = {
+    video: (
+      <>
+        <rect x="2" y="6" width="13" height="12" rx="2" />
+        <path d="m15 10 6-3v10l-6-3" />
+      </>
+    ),
+    list: (
+      <>
+        <path d="M9 6h11M9 12h11M9 18h11" />
+        <path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2" />
+      </>
+    ),
     arrow: (
       <>
         <path d="M5 12h14" />
@@ -342,18 +387,22 @@ function Logo({ light = false }: { light?: boolean }) {
   )
 }
 
-function Home({ onStart }: { onStart: () => void }) {
+function Home({
+  onStartTenant,
+  onStartLandlord,
+}: {
+  onStartTenant: () => void
+  onStartLandlord: () => void
+}) {
   return (
     <main className="home-screen">
       <nav className="home-nav">
         <Logo light />
         <div className="nav-links">
           <a href="#how">How it works</a>
-          <a href="#trust">Trust & safety</a>
+          <a href="#roles">Who it&apos;s for</a>
+          <a href="#backend">Backend test</a>
         </div>
-        <button className="nav-cta" onClick={onStart}>
-          Find my matches <Icon name="arrow" size={17} />
-        </button>
       </nav>
 
       <section className="hero">
@@ -378,20 +427,33 @@ function Home({ onStart }: { onStart: () => void }) {
             <em>kind of people.</em>
           </h1>
           <p className="hero-subtitle">
-            Find trusted flatmates who fit your rhythm, not just your rent.
-            Thoughtful matching for student life in Hong Kong.
+            Students find compatible flatmates; landlords list homes on an
+            OpenStreetMap — one Hong Kong housing community.
           </p>
-          <button className="hero-cta" onClick={onStart}>
-            <span>
-              <b>Start matching</b>
-              <small>
-                Free · {questions.length} questions · about 3 minutes
-              </small>
-            </span>
-            <span className="cta-icon">
-              <Icon name="arrow" />
-            </span>
-          </button>
+          <div className="hero-role-grid" id="roles">
+            <button type="button" className="hero-cta" onClick={onStartTenant}>
+              <span>
+                <b>I&apos;m a student tenant</b>
+                <small>Match · chat · find a flat</small>
+              </span>
+              <span className="cta-icon">
+                <Icon name="arrow" />
+              </span>
+            </button>
+            <button
+              type="button"
+              className="hero-cta hero-cta--landlord"
+              onClick={onStartLandlord}
+            >
+              <span>
+                <b>I&apos;m a landlord or flat owner</b>
+                <small>List & manage properties on the map</small>
+              </span>
+              <span className="cta-icon">
+                <Icon name="home" />
+              </span>
+            </button>
+          </div>
         </div>
         <div className="hero-stats" id="trust">
           <span>
@@ -405,6 +467,8 @@ function Home({ onStart }: { onStart: () => void }) {
           </span>
         </div>
       </section>
+
+      <BackendHealthCheck />
 
       <section className="how-section" id="how">
         <p className="section-kicker">Less scrolling. More certainty.</p>
@@ -471,6 +535,8 @@ function Shell({
 function Verify({
   onBack,
   onVerified,
+  initialEmail = "",
+  onClearStoredEmail,
 }: {
   onBack: () => void
   /** `existing` is the account already on file for that email, or null. */
@@ -486,7 +552,7 @@ function Verify({
   const [error, setError] = useState("")
   // Exact allowlist match — see lib/institutions.ts (CP.validate_institution_email.v1).
   const check = validateInstitutionEmail(email)
-  const valid = check.eligible
+  const valid = check.eligible//isValidDemoEmail(email)
   // The curated demo cast is reached through a demo/admin local part, never a
   // normal student address. See lib/demoData.ts.
   const curated = isCuratedEmail(email)
@@ -615,6 +681,21 @@ function Verify({
             {sending ? "Sending…" : "Verify & continue"}{" "}
             <Icon name="arrow" size={19} />
           </button>
+          {initialEmail ? (
+            <button
+              type="button"
+              className="back-button"
+              style={{ marginTop: 12 }}
+              onClick={() => {
+                clearDemoSession()
+                onClearStoredEmail?.()
+                setEmail("")
+                setTouched(false)
+              }}
+            >
+              Use a different email
+            </button>
+          ) : null}
           <div className="required-note">
             <Icon name="lock" size={14} /> Required to keep our community
             trusted
@@ -827,6 +908,8 @@ function Quiz({
   function next() {
     if (!canContinue) return
     if (pageIndex === QUIZ_PAGES.length - 1) onComplete(answers)
+    if (selected === undefined) return
+    if (index === questions.length - 1) onComplete(answers)
     else {
       setPageIndex(pageIndex + 1)
       window.scrollTo({ top: 0, behavior: "smooth" })
@@ -1234,6 +1317,16 @@ function Matches({
     Record<string, { reaction: ReactionId; reply: string }>
   >({})
   const [threads, setThreads] = useState<Record<string, Message[]>>({})
+  onSignOut,
+}: {
+  email: string
+  onSignOut: () => void
+}) {
+  type WorkspaceTab = "matches" | "messages" | "flats" | "plan"
+  const quizAnswers = useMemo(() => getQuizAnswers(), [])
+  const [activeMatch, setActiveMatch] = useState<typeof matches[number] | null>(
+    null,
+  )
   const [tab, setTab] = useState<WorkspaceTab>("matches")
   const [chatId, setChatId] = useState("")
   const [draft, setDraft] = useState("")
@@ -1340,6 +1433,35 @@ function Matches({
     listingId: number
     name: string
   } | null>(null)
+  const [messages, setMessages] = useState([
+    {
+      from: "them",
+      text: "Hi! I saw we matched on quiet weekdays and keeping shared spaces tidy. That sounds ideal.",
+      time: "10:24",
+    },
+    {
+      from: "me",
+      text: "Same here. I’m hoping to find somewhere near the East Rail line. Are you already looking?",
+      time: "10:31",
+    },
+    {
+      from: "them",
+      text: "Yes, mostly Sha Tin and Tai Wai. Want to shortlist a few flats together?",
+      time: "10:34",
+    },
+  ])
+  const [shortlist, setShortlist] = useState<number[]>([1])
+  const [selectedFlat] = useState(flats[0])
+  const [tourFlat, setTourFlat] = useState<typeof flats[number] | null>(null)
+  const [tourAngle, setTourAngle] = useState(180)
+  const [tourRoom, setTourRoom] = useState(0)
+  const [tourMode, setTourMode] = useState<"3d" | "ar">("3d")
+  const [arActive, setArActive] = useState(false)
+  const [arError, setArError] = useState("")
+  const [placedItem, setPlacedItem] = useState<"bed" | "desk" | "sofa" | null>(
+    null,
+  )
+  const arVideoRef = useRef<HTMLVideoElement>(null)
   const panoramaDrag = useRef<{ startX: number; startAngle: number } | null>(
     null,
   )
@@ -1626,6 +1748,8 @@ function Matches({
    */
   function startChat(match: MatchView) {
     setChatId(match.id)
+  function startChat(match: typeof matches[number]) {
+    setChatMatch(match)
     setActiveMatch(null)
     setTab("messages")
   }
@@ -1934,6 +2058,24 @@ function Matches({
             </div>
           )}
         </div>
+          <button
+            className={tab === "plan" ? "active" : ""}
+            onClick={() => setTab("plan")}
+          >
+            <Icon name="list" size={17} /> My plan
+          </button>
+        </nav>
+        <button
+          className="profile-chip"
+          onClick={onSignOut}
+          title="Sign out and use another email"
+        >
+          <span>{firstName.slice(0, 1).toUpperCase()}</span>
+          <span>
+            <b>{firstName}</b>
+            <small>Signed in · tap to switch</small>
+          </span>
+        </button>
       </header>
 
       {/* Signing back in restores the account rather than restarting the quiz.
@@ -2522,6 +2664,35 @@ function Matches({
                 </button>
               </form>
             )}
+            <div className="chat-quick-actions">
+              <a
+                href="https://meet.google.com/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="video" size={15} /> Start a Google Meet
+              </a>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraft(
+                    `Want to view a flat together this weekend? I can start a Google Meet first so we can shortlist places and agree a time to visit.`,
+                  )
+                }
+              >
+                <Icon name="home" size={15} /> Propose a viewing meetup
+              </button>
+            </div>
+            <form className="message-composer" onSubmit={sendMessage}>
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder={`Message ${chatMatch.name.split(" ")[0]}...`}
+              />
+              <button disabled={!draft.trim()} aria-label="Send message">
+                <Icon name="send" size={18} />
+              </button>
+            </form>
           </div>
           {/* YOUR saved homes. Not "shared with {person}" — these are yours,
               they survive every conversation, and sending one into this chat is
@@ -3079,6 +3250,25 @@ function Matches({
             </>
           )}
         </section>
+      {tab === "flats" && (
+        <>
+          <FlatsMapExplorer
+            onOpenLegacyTour={() => {
+              setTourFlat(selectedFlat)
+              setTourAngle(180)
+              setTourRoom(0)
+              setTourMode("3d")
+            }}
+          />
+          <button className="floating-chat" onClick={() => setTab("messages")}>
+            <img src={chatMatch.image} alt="" />
+            <span>
+              <b>Planning with {chatMatch.name.split(" ")[0]}</b>
+              <small>{shortlist.length} flats shortlisted together</small>
+            </span>
+            <Icon name="chat" />
+          </button>
+        </>
       )}
 
       {tab === "review" && isAdmin && <AdminQueue />}
@@ -3105,7 +3295,24 @@ function Matches({
           <Icon name="home" size={19} />
           <span>Homes</span>
         </button>
+        <button
+          className={tab === "plan" ? "active" : ""}
+          onClick={() => setTab("plan")}
+        >
+          <Icon name="list" size={19} />
+          <span>Plan</span>
+        </button>
       </nav>
+
+      {tab === "plan" && (
+        <SettlingPlan
+          answers={quizAnswers}
+          onFindFlats={() => setTab("flats")}
+          onOpenMessages={() => setTab("messages")}
+        />
+      )}
+
+      <RentChatbot />
 
       {activeMatch && (
         <div className="modal-backdrop" onClick={() => setActiveMatch(null)}>
@@ -3172,6 +3379,7 @@ function Matches({
                 ran before this number existed.
               </p>
             </div>
+            <MatchNarrative match={activeMatch} answers={quizAnswers} />
             <div className="modal-details">
               <span>
                 <small>Target area</small>
@@ -3600,11 +3808,70 @@ export default function App() {
       </Shell>
     )
   if (screen === "home") return <Home onStart={() => setScreen("verify")} />
+function resolveScreenAfterStart(): Screen {
+  const stored = getStoredEmail()
+  if (stored && isOnboarded()) return "matches"
+  if (stored) return "quiz"
+  return "verify"
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (!isOnboarded() || !getStoredEmail()) return "home"
+    if (getUserRole() === "landlord") return "landlord-dashboard"
+    return "matches"
+  })
+  const [email, setEmail] = useState(() => getStoredEmail())
+
+  function beginMatchingFlow() {
+    setUserRole("tenant")
+    const stored = getStoredEmail()
+    setEmail(stored)
+    setScreen(resolveScreenAfterStart())
+  }
+
+  function beginLandlordFlow() {
+    if (getUserRole() === "landlord" && isOnboarded()) {
+      setScreen("landlord-dashboard")
+      return
+    }
+    setScreen("landlord-entry")
+  }
+
+  if (screen === "home")
+    return (
+      <Home
+        onStartTenant={beginMatchingFlow}
+        onStartLandlord={beginLandlordFlow}
+      />
+    )
+  if (screen === "landlord-entry")
+    return (
+      <LandlordEntry
+        onBack={() => setScreen("home")}
+        onComplete={() => setScreen("landlord-dashboard")}
+      />
+    )
+  if (screen === "landlord-dashboard")
+    return (
+      <LandlordDashboard
+        onSignOut={() => {
+          clearDemoSession()
+          setEmail("")
+          setScreen("home")
+        }}
+      />
+    )
   if (screen === "verify")
     return (
       <Verify
+        initialEmail={email}
         onBack={() => setScreen("home")}
         onVerified={(value, inst, existing) => {
+        onClearStoredEmail={() => setEmail("")}
+        onVerified={(value) => {
+          setUserRole("tenant")
+          setStoredEmail(value)
           setEmail(value)
           setInstitution(inst)
           if (existing) {
@@ -3638,6 +3905,10 @@ export default function App() {
           setRestored(false)
           // The save is reported, not assumed — see ProfileSync in lib/api.ts.
           void saveProfile(next, email, institution?.name).then(setProfileSync)
+        onBack={() => setScreen("verify")}
+        onComplete={(answers) => {
+          setQuizAnswers(answers)
+          setOnboardedComplete()
           setScreen("matches")
         }}
       />
@@ -3652,6 +3923,12 @@ export default function App() {
       onDismissRestored={() => setRestored(false)}
       onEditAnswers={() => setScreen("quiz")}
       onLogout={logOut}
+      email={email || getStoredEmail()}
+      onSignOut={() => {
+        clearDemoSession()
+        setEmail("")
+        setScreen("verify")
+      }}
     />
   )
 }

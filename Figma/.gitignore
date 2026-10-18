@@ -1,11 +1,8 @@
+# Figma Make / platform paths — env rules in repo root .gitignore
 node_modules/
 dist/
 build/
 .cache/
-.env
-.env.local
-.env.*.local
-!.env.example
 .vite/
 vite.config.*.timestamp-*
 *.tsbuildinfo
@@ -15,10 +12,5 @@ logs/
 .claude-replay.*
 .tmp-*
 /.figma/design-context/
-src/imports/
-# Platform-managed agentplat state, not project source. In the
-# client-initiated single-repo workspace layout (make's `Path: "."` spec) the
-# repo root IS the workspace root, so these land inside this repo rather than
-# beside it.
 /.plugins/
 /.opencode-skills/

@@ -1,0 +1,58 @@
+# Render Blueprint — two services: map API (Node) + static site (Vite build).
+# Dashboard → New → Blueprint → pick this repo. Render asks for every `sync: false` value.
+# Every `git push` to the connected branch redeploys automatically.
+#
+# Order matters for URLs: after the first deploy, set CORS_ORIGINS on the API to the
+# static site URL, and VITE_MAP_API_URL on the site to the API URL, then redeploy both.
+
+services:
+  - type: web
+    name: rentmate-map-api
+    runtime: node
+    plan: free
+    rootDir: backend/server
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Your static site origin, e.g. https://rentmate-web.onrender.com (comma-separate several)
+      - key: CORS_ORIGINS
+        sync: false
+      - key: OSM_USER_AGENT
+        value: RentMate/1.0 (https://github.com/GenAI4SDG/rentMate)
+
+  - type: web
+    name: rentmate-web
+    runtime: static
+    rootDir: Figma
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      # Public URL of rentmate-map-api, e.g. https://rentmate-map-api.onrender.com
+      - key: VITE_MAP_API_URL
+        sync: false
+      # mock = rule-based placeholder (default). api = your own GenAI endpoints.
+      - key: VITE_GENAI_MODE
+        value: mock
+      - key: VITE_SHOW_DEMO_OWNER
+        value: "false"

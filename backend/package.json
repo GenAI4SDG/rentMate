@@ -7,6 +7,10 @@
     "db:push": "supabase db push",
     "start": "supabase start",
     "stop": "supabase stop",
-    "functions:serve": "supabase functions serve --env-file .env.local"
+    "functions:serve": "supabase functions serve --env-file server/.env.local",
+    "map-api:dev": "npm run dev --prefix server",
+    "seed:listings": "npm run seed:listings --prefix server",
+    "map-api:seed": "npm run seed:listings --prefix server",
+    "map-api:test": "npm test --prefix server"
   }
 }
