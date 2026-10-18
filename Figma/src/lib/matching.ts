@@ -1,7 +1,7 @@
 // Deterministic matching logic — the TypeScript twin of the SQL function
 // `public.calculate_match_score` and of the frozen contracts in `vault/cps/`:
 //   - CP.calculate_match.v2         (the soft score)
-//   - CP.filter_eligible_matches.v1 (the hard gate)
+//   - CP.filter_eligible_matches.v2 (the hard gate — five families, both directions)
 //
 // THE SPLIT, as the owner defined it:
 //   SOFT  (scored, conflation is fine): lifestyle scalars + MBTI.
@@ -319,7 +319,7 @@ export function flatSizeWarningForHome(
   return `Heads up: this one is ${sqft} sq ft, under the ${min} sq ft you said you'd want.`;
 }
 
-/** CP.filter_eligible_matches.v1 — every hard constraint, both directions. */
+/** CP.filter_eligible_matches.v2 — every hard constraint, both directions. */
 export function filterReasons(seeker: Profile, other: Profile): GateFinding[] {
   const pairs: Array<[GateFinding["field"], string | null, string | null]> = [
     ["gender", genderReason(seeker, other, "you"), genderReason(other, seeker, "them")],

@@ -13,7 +13,7 @@
         {
           "id": "CP.calculate_match.v2",
           "edit_tag_version": 2,
-          "content_sha256": "5007793f6d107cb64203780b9ed635e861dfa6641aeb881a29e95ac740c708d8"
+          "content_sha256": "1918f0d627946c215eb1301b27bfe3ec9790cba40836e963fb7572536b58631e"
         }
       ],
       "retained_constraints": [
@@ -34,58 +34,59 @@
       }
     },
     {
-      "id": "PF.CP.filter_eligible_matches.v1",
+      "id": "PF.CP.filter_eligible_matches.v2",
       "intent_node": "IP.rentmate.compatibility",
       "derived_from": [
-        "CP.filter_eligible_matches.v1"
+        "CP.filter_eligible_matches.v2"
       ],
       "dependent_cps": [
         {
-          "id": "CP.filter_eligible_matches.v1",
-          "edit_tag_version": 1,
-          "content_sha256": "19e7e46736c026c61de853fd9bc44198e93a23b15ca9e88bd23d06bdf5e51dc6"
+          "id": "CP.filter_eligible_matches.v2",
+          "edit_tag_version": 2,
+          "content_sha256": "a2670dbab2245df6f31ecd8abaf908036459a85d218be018904ed3fb8730d609"
         }
       ],
       "retained_constraints": [
-        "explicit hard constraints only; a missing or undisclosed value never satisfies a stated category",
-        "both directions must pass when both sides state a strict requirement",
+        "five explicit hard-constraint families (gender, belief, smoking, commute/location, budget), each applied in both directions",
+        "a missing or undisclosed value never satisfies a stated requirement; an unknown commute estimate or unstated budget never fires, so unknown never silently excludes",
+        "flat size is not a gate: it warns when a HOME is suggested outside it, it never hides a person",
         "pure predicate: no I/O, no state, no retry"
       ],
       "dropped_constraints": [],
       "epistemic_outcome": "unknown",
       "origin": "unstated",
       "evidence": "",
-      "summary": "CP.filter_eligible_matches.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "summary": "CP.filter_eligible_matches.v2 abstracted; feasibility not analysed (no Profiles, no measured workload)",
       "metadata": {
-        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.filter_eligible_matches.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.filter_eligible_matches.v2.md (frontmatter + body); no human reviewed the paraphrase",
         "reviewed_by_human": false
       }
     },
     {
-      "id": "PF.CP.validate_institution_email.v1",
+      "id": "PF.CP.validate_institution_email.v2",
       "intent_node": "IP.rentmate.safety",
       "derived_from": [
-        "CP.validate_institution_email.v1"
+        "CP.validate_institution_email.v2"
       ],
       "dependent_cps": [
         {
-          "id": "CP.validate_institution_email.v1",
-          "edit_tag_version": 1,
-          "content_sha256": "4b6f1fdab498c145f23588f6ad10f326b2ba3ee1aae483ce0f26968bc8ed508d"
+          "id": "CP.validate_institution_email.v2",
+          "edit_tag_version": 2,
+          "content_sha256": "5ab221c1d2592741ffc0c8b9b5072a76884abca03c579af762d4ab657223984e"
         }
       ],
       "retained_constraints": [
-        "exact or dot-boundary domain match against a server-side allowlist; never substring",
-        "eligibility is not verification; the return carries no verified claim",
+        "exact or dot-boundary domain match against the client-side allowlist; never substring",
+        "eligibility is not verification; nothing is stored to attest it and there is no Auth to defer confirmation to",
         "pure and offline: the allowlist is configuration, not contract"
       ],
       "dropped_constraints": [],
       "epistemic_outcome": "unknown",
       "origin": "unstated",
       "evidence": "",
-      "summary": "CP.validate_institution_email.v1 abstracted; feasibility not analysed (no Profiles, no measured workload)",
+      "summary": "CP.validate_institution_email.v2 abstracted; feasibility not analysed (no Profiles, no measured workload)",
       "metadata": {
-        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.validate_institution_email.v1.md (frontmatter + body); no human reviewed the paraphrase",
+        "constraint_source": "retained_constraints paraphrased by the agent from vault/cps/CP.validate_institution_email.v2.md (frontmatter + body); no human reviewed the paraphrase",
         "reviewed_by_human": false
       }
     }

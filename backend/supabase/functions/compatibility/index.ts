@@ -13,7 +13,7 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 //      its own cached narrative regardless, so this function's narrative is only a
 //      server-side fallback.
 //
-// The hard-constraint gate (CP.filter_eligible_matches.v1) runs BEFORE scoring:
+// The hard-constraint gate (CP.filter_eligible_matches.v2) runs BEFORE scoring:
 // gender and smoking exclude candidates and never contribute a number.
 
 type Profile = {

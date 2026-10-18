@@ -1,8 +1,11 @@
-// University-email eligibility — CP.validate_institution_email.v1.
+// University-email eligibility — CP.validate_institution_email.v2.
 //
-// ELIGIBILITY IS NOT VERIFICATION. A matching domain proves the address *looks*
-// like a university address; it does not prove the mailbox exists or belongs to
-// the student. Real confirmation is Supabase Auth's job (see lib/api.ts).
+// ELIGIBILITY IS NOT VERIFICATION, AND THERE IS NO LATER STEP. A matching
+// domain proves the address *looks* like a university address; it does not
+// prove the mailbox exists or belongs to the student. The student flow has
+// NO Auth of any kind (no password, no OTP, no session) and stores nothing to
+// attest a pass — the email is the account key. The gate is a UX affordance,
+// not a security control (IP.rentmate.v3, U8).
 //
 // The list below is the team's own published table (12 institutions, 41 email
 // domains, English + Chinese names). Match is EXACT / dot-boundary only — never a

@@ -27,10 +27,15 @@ OUT = VAULT / "PG.rentmate.v3.json"
 # here in one place (never inferred from prose), so the mapping is reviewable.
 # `dropped_constraints` is [] for all three: nothing was dropped, and an empty
 # list is a DECLARATION, not an omission (SPEC.md §3).
+#
+# Keyed by the CURRENT id: on 2026-10-18 the filter and email CPs were
+# rewritten as v2 (see vault/README.md). The v1 files stay on disk, superseded,
+# and are skipped by the latest-version selection below.
 RETAINED = {
-    "CP.filter_eligible_matches.v1": [
-        "explicit hard constraints only; a missing or undisclosed value never satisfies a stated category",
-        "both directions must pass when both sides state a strict requirement",
+    "CP.filter_eligible_matches.v2": [
+        "five explicit hard-constraint families (gender, belief, smoking, commute/location, budget), each applied in both directions",
+        "a missing or undisclosed value never satisfies a stated requirement; an unknown commute estimate or unstated budget never fires, so unknown never silently excludes",
+        "flat size is not a gate: it warns when a HOME is suggested outside it, it never hides a person",
         "pure predicate: no I/O, no state, no retry",
     ],
     "CP.calculate_match.v2": [
@@ -40,9 +45,9 @@ RETAINED = {
         "a factor present on one side only is omitted and the rest renormalized, never imputed as 0",
         "gender, smoking, location, budget, amenities and size never contribute (gender/smoking are hard filters upstream)",
     ],
-    "CP.validate_institution_email.v1": [
-        "exact or dot-boundary domain match against a server-side allowlist; never substring",
-        "eligibility is not verification; the return carries no verified claim",
+    "CP.validate_institution_email.v2": [
+        "exact or dot-boundary domain match against the client-side allowlist; never substring",
+        "eligibility is not verification; nothing is stored to attest it and there is no Auth to defer confirmation to",
         "pure and offline: the allowlist is configuration, not contract",
     ],
 }
@@ -51,12 +56,37 @@ ORIGIN_NOTE = ("retained_constraints paraphrased by the agent from {path} "
                "(frontmatter + body); no human reviewed the paraphrase")
 
 
+def base_id(cp_id: str) -> str:
+    """CP.<name>.v<N> -> CP.<name> (the version suffix is the last .v<digits>)."""
+    head, sep, tail = cp_id.rpartition(".v")
+    return head if sep and tail.isdigit() else cp_id
+
+
+def latest_per_base(docs: list) -> list:
+    """One doc per base id: the highest edit_tag version on disk.
+
+    Superseded versions stay on disk (the IP's own convention — v2 is kept
+    because v3's diff table is written against it) but must not double-count
+    into the graph. Selection is by the tool-enforced edit_tag.version, never
+    by mtime, so a hand-touched old file cannot resurrect itself.
+    """
+    best: dict = {}
+    for doc in docs:
+        data = doc.data or {}
+        cid = str(data.get("id", ""))
+        version = int((data.get("edit_tag") or {}).get("version") or 0)
+        if cid and (base_id(cid) not in best or version > best[base_id(cid)][0]):
+            best[base_id(cid)] = (version, doc)
+    return [doc for _, doc in best.values()]
+
+
 def build() -> dict:
     docs = [cp_tool.load_cp(p) for p in sorted(CPS_DIR.glob("*.md"))]
     corpus = pg.corpus_from_docs(docs)
+    current = latest_per_base(docs)        # superseded versions stay on disk, out of the graph
 
     facts = []
-    for doc in sorted(docs, key=lambda d: str((d.data or {}).get("id", ""))):
+    for doc in sorted(current, key=lambda d: str((d.data or {}).get("id", ""))):
         data = doc.data or {}
         cid = str(data.get("id", ""))
         if not cid or cid not in corpus:
@@ -91,9 +121,9 @@ def build() -> dict:
 
     graph = pg.ProjectGraph(intent_id="IP.rentmate.v3", facts=facts)
 
-    # coverage, resolved from the CP corpus the same way ip_tool.link does.
+    # coverage, resolved from the CURRENT CPs the same way ip_tool.link does.
     assign: dict = {}
-    for doc in docs:
+    for doc in current:
         data = doc.data or {}
         cid = str(data.get("id", ""))
         if not cid:
@@ -110,6 +140,7 @@ def build() -> dict:
         "soft": [f for f in findings if f.severity == "soft"],
         "coverage": pg.coverage(graph, ip_nodes_to_cps=assign),
         "staleness": pg.stale_facts(graph, corpus=corpus),
+        "superseded": [str((d.data or {}).get("id", "")) for d in docs if d not in current],
     }
 
 
@@ -118,6 +149,8 @@ def main() -> int:
     graph = r["graph"]
 
     print(f"PG build -- {graph.intent_id}\n")
+    if r["superseded"]:
+        print("superseded on disk (kept, not abstracted): " + ", ".join(sorted(r["superseded"])))
     print(f"facts: {len(graph.facts)}")
     for f in graph.facts:
         print(f"  {f.id:34s} -> {f.intent_node}  (origin={f.origin}, "

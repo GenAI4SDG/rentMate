@@ -136,7 +136,8 @@ approval:
   attest_readability: true
   attest_minimalism: true
   attest_debuggability: true
-  content_sha256: 5007793f6d107cb64203780b9ed635e861dfa6641aeb881a29e95ac740c708d8
+  content_sha256: 1918f0d627946c215eb1301b27bfe3ec9790cba40836e963fb7572536b58631e
+  body_sha256: 4bb7ecec16beffba9092070908a44c17a1c02ad335ee45daaffc2823836137df
 ---
 
 # CP: `calculate_match`
