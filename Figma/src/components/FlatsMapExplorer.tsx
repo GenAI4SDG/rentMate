@@ -1,25 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import HouseMap from "./HouseMap"
-import ListingFormModal from "./ListingFormModal"
 import {
   fetchListingsBbox,
   fetchNearby,
   geocodeQuery,
   type ListingFeature,
 } from "../lib/listingsApi"
+import { priceContext } from "../lib/priceContext"
 
 type Props = {
   onOpenLegacyTour?: (listing: ListingFeature) => void
-  /** Landlord dashboard only — tenants browse without listing. */
-  allowListProperty?: boolean
-  landlordId?: string
 }
 
-export default function FlatsMapExplorer({
-  onOpenLegacyTour,
-  allowListProperty = false,
-  landlordId = "",
-}: Props) {
+export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
   const [features, setFeatures] = useState<ListingFeature[]>([])
   const [selected, setSelected] = useState<ListingFeature | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -33,7 +26,6 @@ export default function FlatsMapExplorer({
   const [nearby, setNearby] = useState<
     Array<{ type: string; name: string; distanceMeters: number }>
   >([])
-  const [showForm, setShowForm] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const loadBbox = useCallback(
@@ -82,6 +74,11 @@ export default function FlatsMapExplorer({
     [features],
   )
 
+  const ctx = useMemo(
+    () => (selected ? priceContext(selected, features) : null),
+    [selected, features],
+  )
+
   async function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
     const q = search.trim()
@@ -127,11 +124,6 @@ export default function FlatsMapExplorer({
           >
             Under $20K
           </button>
-          {allowListProperty ? (
-            <button type="button" onClick={() => setShowForm(true)}>
-              List a property
-            </button>
-          ) : null}
         </div>
         <div className="mobile-map-switch">
           <button
@@ -196,6 +188,22 @@ export default function FlatsMapExplorer({
                   <b>HK${selected.properties.price.toLocaleString()}</b>
                   <span>/ month</span>
                 </div>
+                {ctx ? (
+                  <p className={`price-context ${ctx.verdict}`}>
+                    <b>
+                      {ctx.verdict === "typical"
+                        ? "In line with the area"
+                        : ctx.verdict === "below"
+                          ? `${Math.abs(ctx.diffPercent)}% below the area median`
+                          : `${ctx.diffPercent}% above the area median`}
+                    </b>
+                    <small>
+                      Median HK${Math.round(ctx.median).toLocaleString()} across{" "}
+                      {ctx.sampleSize} Rent Mate listings in {ctx.district}. Not
+                      official R&amp;VD data.
+                    </small>
+                  </p>
+                ) : null}
                 {onOpenLegacyTour && (
                   <button
                     type="button"
@@ -252,16 +260,6 @@ export default function FlatsMapExplorer({
         </div>
       </div>
 
-      {showForm && (
-        <ListingFormModal
-          landlordId={landlordId}
-          onClose={() => setShowForm(false)}
-          onCreated={() => {
-            setShowForm(false)
-            setError(null)
-          }}
-        />
-      )}
     </section>
   )
 }

@@ -1,8 +1,8 @@
 const EMAIL_KEY = "rentmate_demo_email"
 const ONBOARDED_KEY = "rentmate_demo_onboarded"
 const ROLE_KEY = "rentmate_user_role"
-const LANDLORD_ID_KEY = "rentmate_landlord_id"
 const DISPLAY_NAME_KEY = "rentmate_display_name"
+const QUIZ_KEY = "rentmate_quiz_answers"
 
 export type UserRole = "tenant" | "landlord"
 
@@ -69,17 +69,20 @@ export function setDisplayName(name: string): void {
   }
 }
 
-export function getLandlordId(): string {
+/** Quiz answers (option index per question) — feeds the narrative & settling-in plan. */
+export function getQuizAnswers(): number[] {
   try {
-    return localStorage.getItem(LANDLORD_ID_KEY)?.trim() ?? ""
+    const raw = localStorage.getItem(QUIZ_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((n) => typeof n === "number") : []
   } catch {
-    return ""
+    return []
   }
 }
 
-export function setLandlordId(id: string): void {
+export function setQuizAnswers(answers: number[]): void {
   try {
-    localStorage.setItem(LANDLORD_ID_KEY, id)
+    localStorage.setItem(QUIZ_KEY, JSON.stringify(answers))
   } catch {
     /* ignore */
   }
@@ -109,28 +112,9 @@ export function clearDemoSession(): void {
     localStorage.removeItem(EMAIL_KEY)
     localStorage.removeItem(ONBOARDED_KEY)
     localStorage.removeItem(ROLE_KEY)
-    localStorage.removeItem(LANDLORD_ID_KEY)
     localStorage.removeItem(DISPLAY_NAME_KEY)
+    localStorage.removeItem(QUIZ_KEY)
   } catch {
     /* ignore */
-  }
-}
-
-export async function resolveDemoLandlordId(): Promise<string | null> {
-  const cached = getLandlordId()
-  if (cached) return cached
-  const fromEnv = import.meta.env.VITE_DEMO_LANDLORD_ID
-  if (fromEnv) {
-    setLandlordId(fromEnv)
-    return fromEnv
-  }
-  try {
-    const res = await fetch("/api/public/demo-landlord")
-    if (!res.ok) return null
-    const data = (await res.json()) as { id: string }
-    setLandlordId(data.id)
-    return data.id
-  } catch {
-    return null
   }
 }

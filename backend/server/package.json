@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "start:tsx": "tsx src/index.ts",
     "build": "tsc",
     "test": "vitest run",
     "seed:listings": "tsx src/scripts/seed-listings.ts",
@@ -15,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.1",
     "pg": "^8.13.3",
     "zod": "^3.24.2"
   },

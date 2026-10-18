@@ -6,11 +6,12 @@ import {
 } from "./seed-data.js"
 
 runSeedListings()
-  .then((userId) => {
+  .then(() => {
     console.log("Seed complete.")
-    console.log(`Landlord: ${SEED_LANDLORD_NAME} (${SEED_LANDLORD_EMAIL})`)
-    console.log("Optional — add to Figma/.env.local (UUID only, not service_role):")
-    console.log(`VITE_DEMO_LANDLORD_ID=${userId}`)
+    console.log(`Demo owner: ${SEED_LANDLORD_NAME} (${SEED_LANDLORD_EMAIL})`)
+    console.log(
+      `Password: ${process.env.SEED_LANDLORD_PASSWORD ?? "rentmate-testing-demo"}`,
+    )
   })
   .catch((e) => {
     console.error(e)

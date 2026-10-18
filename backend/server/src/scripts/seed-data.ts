@@ -29,7 +29,7 @@ export async function runSeedListings(): Promise<string> {
   if (!userId) {
     const { data, error } = await admin.auth.admin.createUser({
       email: SEED_LANDLORD_EMAIL,
-      password: "rentmate-testing-demo",
+      password: process.env.SEED_LANDLORD_PASSWORD ?? "rentmate-testing-demo",
       email_confirm: true,
       user_metadata: { full_name: SEED_LANDLORD_NAME },
     })

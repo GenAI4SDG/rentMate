@@ -1,3 +1,5 @@
+import { mapApiUrl } from "./api-base"
+
 export type ListingFeature = {
   type: "Feature"
   geometry: { type: "Point"; coordinates: [number, number] }
@@ -42,13 +44,13 @@ export async function fetchListingsBbox(
   if (filters.bedrooms != null)
     params.set("bedrooms", String(filters.bedrooms))
 
-  const res = await fetch(`/api/listings?${params}`, { signal })
+  const res = await fetch(mapApiUrl(`/api/listings?${params}`), { signal })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
 
 export async function geocodeQuery(q: string): Promise<GeocodeResponse> {
-  const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`)
+  const res = await fetch(mapApiUrl(`/api/geocode?q=${encodeURIComponent(q)}`))
   if (!res.ok) throw new Error("Geocode failed")
   return res.json()
 }
@@ -58,7 +60,9 @@ export async function fetchNearby(
   radius = 500,
 ): Promise<{ places: Array<{ type: string; name: string; distanceMeters: number }> }> {
   const res = await fetch(
-    `/api/listings/${id}/nearby?radius=${radius}&types=transit,school,supermarket`,
+    mapApiUrl(
+      `/api/listings/${id}/nearby?radius=${radius}&types=transit,school,supermarket`,
+    ),
   )
   if (!res.ok) return { places: [] }
   return res.json()

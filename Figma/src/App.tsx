@@ -1,11 +1,13 @@
 import { FormEvent, ReactNode, useMemo, useRef, useState } from "react"
 import {
   clearDemoSession,
+  getQuizAnswers,
   getStoredEmail,
   getUserRole,
   isOnboarded,
   isValidDemoEmail,
   setOnboardedComplete,
+  setQuizAnswers,
   setStoredEmail,
   setUserRole,
 } from "./lib/demo-session"
@@ -13,6 +15,9 @@ import BackendHealthCheck from "./components/BackendHealthCheck"
 import FlatsMapExplorer from "./components/FlatsMapExplorer"
 import LandlordDashboard from "./components/LandlordDashboard"
 import LandlordEntry from "./components/LandlordEntry"
+import MatchNarrative from "./components/MatchNarrative"
+import RentChatbot from "./components/RentChatbot"
+import SettlingPlan from "./components/SettlingPlan"
 
 type Screen =
   | "home"
@@ -365,11 +370,23 @@ function Icon({
   size = 20,
   strokeWidth = 1.8,
 }: {
-  name: "arrow" | "back" | "check" | "home" | "lock" | "mail" | "spark" | "user" | "heart" | "chat" | "search" | "send"
+  name: "arrow" | "back" | "check" | "home" | "lock" | "mail" | "spark" | "user" | "heart" | "chat" | "search" | "send" | "video" | "list"
   size?: number
   strokeWidth?: number
 }) {
   const paths: Record<string, ReactNode> = {
+    video: (
+      <>
+        <rect x="2" y="6" width="13" height="12" rx="2" />
+        <path d="m15 10 6-3v10l-6-3" />
+      </>
+    ),
+    list: (
+      <>
+        <path d="M9 6h11M9 12h11M9 18h11" />
+        <path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2" />
+      </>
+    ),
     arrow: (
       <>
         <path d="M5 12h14" />
@@ -752,7 +769,7 @@ function Quiz({
   onComplete,
 }: {
   onBack: () => void
-  onComplete: () => void
+  onComplete: (answers: number[]) => void
 }) {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<number[]>([])
@@ -773,7 +790,7 @@ function Quiz({
 
   function next() {
     if (selected === undefined) return
-    if (index === questions.length - 1) onComplete()
+    if (index === questions.length - 1) onComplete(answers)
     else {
       setIndex(index + 1)
       window.scrollTo({ top: 0, behavior: "smooth" })
@@ -934,7 +951,8 @@ function Matches({
   email: string
   onSignOut: () => void
 }) {
-  type WorkspaceTab = "matches" | "messages" | "flats"
+  type WorkspaceTab = "matches" | "messages" | "flats" | "plan"
+  const quizAnswers = useMemo(() => getQuizAnswers(), [])
   const [activeMatch, setActiveMatch] = useState<typeof matches[number] | null>(
     null,
   )
@@ -1071,6 +1089,12 @@ function Matches({
           >
             <Icon name="home" size={17} /> Find a flat
           </button>
+          <button
+            className={tab === "plan" ? "active" : ""}
+            onClick={() => setTab("plan")}
+          >
+            <Icon name="list" size={17} /> My plan
+          </button>
         </nav>
         <button
           className="profile-chip"
@@ -1193,6 +1217,25 @@ function Matches({
                 </div>
               )}
             </div>
+            <div className="chat-quick-actions">
+              <a
+                href="https://meet.google.com/new"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="video" size={15} /> Start a Google Meet
+              </a>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraft(
+                    `Want to view a flat together this weekend? I can start a Google Meet first so we can shortlist places and agree a time to visit.`,
+                  )
+                }
+              >
+                <Icon name="home" size={15} /> Propose a viewing meetup
+              </button>
+            </div>
             <form className="message-composer" onSubmit={sendMessage}>
               <input
                 value={draft}
@@ -1278,7 +1321,24 @@ function Matches({
           <Icon name="home" size={19} />
           <span>Flats</span>
         </button>
+        <button
+          className={tab === "plan" ? "active" : ""}
+          onClick={() => setTab("plan")}
+        >
+          <Icon name="list" size={19} />
+          <span>Plan</span>
+        </button>
       </nav>
+
+      {tab === "plan" && (
+        <SettlingPlan
+          answers={quizAnswers}
+          onFindFlats={() => setTab("flats")}
+          onOpenMessages={() => setTab("messages")}
+        />
+      )}
+
+      <RentChatbot />
 
       {activeMatch && (
         <div className="modal-backdrop" onClick={() => setActiveMatch(null)}>
@@ -1306,27 +1366,7 @@ function Matches({
                 <span>lifestyle match</span>
               </div>
             </div>
-            <div className="compatibility-box">
-              <p className="section-kicker">Why you match</p>
-              <h3>Your home rhythms naturally align.</h3>
-              <div className="compatibility-bars">
-                {[
-                  ["Daily routine", 96],
-                  ["Communication", 93],
-                  ["Shared spaces", 88],
-                ].map(([label, score]) => (
-                  <div key={label as string}>
-                    <span>
-                      <b>{label}</b>
-                      <small>{score}%</small>
-                    </span>
-                    <i>
-                      <i style={{ width: `${score}%` }} />
-                    </i>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <MatchNarrative match={activeMatch} answers={quizAnswers} />
             <div className="modal-details">
               <span>
                 <small>Preferred area</small>
@@ -1762,7 +1802,8 @@ export default function App() {
     return (
       <Quiz
         onBack={() => setScreen("verify")}
-        onComplete={() => {
+        onComplete={(answers) => {
+          setQuizAnswers(answers)
           setOnboardedComplete()
           setScreen("matches")
         }}

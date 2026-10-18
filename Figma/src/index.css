@@ -257,7 +257,7 @@ a { color: inherit; text-decoration: none; }
 .chat-list > button b { font-size: 12px; }
 .chat-list > button small { overflow: hidden; color: #898983; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .chat-list > button > i { width: 7px; height: 7px; border-radius: 50%; background: var(--terracotta); }
-.chat-thread { min-width: 0; display: grid; grid-template-rows: 72px 1fr 78px; background: #fbfaf6; }
+.chat-thread { min-width: 0; display: grid; grid-template-rows: 72px 1fr auto 78px; background: #fbfaf6; }
 .chat-thread > header { display: flex; align-items: center; gap: 11px; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--paper); }
 .chat-thread > header img { width: 39px; height: 39px; object-fit: cover; border-radius: 50%; }
 .chat-thread > header > span { display: grid; gap: 3px; }
@@ -583,12 +583,12 @@ a { color: inherit; text-decoration: none; }
   .modal-profile > img { width: 65px; height: 65px; }
   .modal-score { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 6px; text-align: left; }
   .matches-screen { padding-bottom: 64px; }
-  .mobile-workspace-nav { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; height: 64px; display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 18px 8px; border-top: 1px solid var(--line); background: rgba(255,253,249,.96); backdrop-filter: blur(12px); }
+  .mobile-workspace-nav { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; height: 64px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 18px 8px; border-top: 1px solid var(--line); background: rgba(255,253,249,.96); backdrop-filter: blur(12px); }
   .mobile-workspace-nav button { display: grid; place-items: center; gap: 2px; border: 0; background: none; color: #888983; font-size: 8px; cursor: pointer; }
   .mobile-workspace-nav button.active { color: var(--terracotta-dark); }
   .chat-workspace { height: calc(100svh - 132px); display: block; }
   .chat-list, .shared-shortlist { display: none; }
-  .chat-thread { height: 100%; grid-template-rows: 66px 1fr 70px; }
+  .chat-thread { height: 100%; grid-template-rows: 66px 1fr auto 70px; }
   .chat-thread > header { padding: 0 14px; }
   .chat-thread > header > button { padding: 8px; font-size: 0; }
   .message-stream { padding: 20px 16px; }
@@ -658,4 +658,119 @@ a { color: inherit; text-decoration: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- Auth, landlord dashboard, forms ---------- */
+.owner-card input { width: 100%; min-height: 48px; margin-bottom: 14px; padding: 0 14px; border: 1px solid #d8d4cc; border-radius: 12px; background: #fbfaf6; font: inherit; }
+.owner-card input:focus { outline: 0; border-color: var(--terracotta); }
+.owner-card label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.auth-switch { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-align: center; }
+.auth-switch button { border: 0; background: none; color: var(--terracotta-dark); font-weight: 700; cursor: pointer; text-decoration: underline; }
+.owner-card .outline-button { width: 100%; margin-top: 6px; min-height: 46px; font-size: 13px; }
+.landlord-header-actions .outline-button { width: auto; min-height: 54px; margin-top: 0; font-size: 14px; padding: 0 22px; }
+
+.listing-form-modal h2 { margin: 0 0 14px; font: 500 28px "Playfair Display", serif; }
+.listing-form-modal label { display: block; margin: 10px 0; font-size: 13px; font-weight: 600; }
+.listing-form-modal input, .listing-form-modal select { width: 100%; margin-top: 4px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: #fbfaf6; font: inherit; font-weight: 400; }
+.listing-form-modal .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.listing-form-modal .outline-button { width: 100%; min-height: 42px; margin: 0 0 6px; font-size: 13px; }
+.listing-form-modal .primary-button { width: 100%; margin-top: 10px; }
+
+.my-listings { margin: 8px 5vw 28px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+.my-listings-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.my-listings-head h2 { margin: 0; font: 500 26px "Playfair Display", serif; }
+.my-listings-head span { color: var(--muted); font-size: 13px; }
+.my-listings-table { display: grid; gap: 8px; max-height: 340px; overflow-y: auto; }
+.my-listing { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.my-listing > div:first-child { min-width: 0; display: grid; gap: 2px; }
+.my-listing b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.my-listing small { color: var(--muted); font-size: 12px; }
+.my-listing.hidden { opacity: .6; }
+.status-pill { padding: 4px 10px; border-radius: 99px; background: #e4f1e6; color: #2f6b3c; font-size: 11px; font-weight: 700; }
+.status-pill.rented { background: #f5e5de; color: var(--terracotta-dark); }
+.status-pill.hidden { background: #ececea; color: #6c6d68; }
+.my-listing-actions { display: flex; gap: 6px; }
+.my-listing-actions button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.my-listing-actions button:hover:not(:disabled) { border-color: var(--terracotta); color: var(--terracotta-dark); }
+.my-listing-actions button.danger:hover:not(:disabled) { border-color: #b64d3d; color: #b64d3d; }
+.my-listing-actions button:disabled { opacity: .5; cursor: default; }
+
+/* ---------- Price context ---------- */
+.price-context { display: grid; gap: 3px; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #f4f1ea; font-size: 13px; }
+.price-context small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.price-context.below { background: #e4f1e6; }
+.price-context.above { background: #fbeee9; }
+
+/* ---------- Match narrative ---------- */
+.compatibility-box h4 { margin: 18px 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.narrative-summary { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.narrative-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.compatibility-box ul { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.55; }
+.compatibility-box li { margin-bottom: 5px; }
+.narrative-source { margin: 14px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.narrative-loading p:last-child { color: var(--muted); font-size: 13px; }
+
+/* ---------- Chat quick actions ---------- */
+.chat-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 24px 0; border-top: 1px solid var(--line); background: var(--paper); }
+.chat-quick-actions a, .chat-quick-actions button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid #d6d2c9; border-radius: 99px; background: var(--paper); color: var(--ink); font: 600 11px inherit; text-decoration: none; cursor: pointer; }
+.chat-quick-actions a:hover, .chat-quick-actions button:hover { border-color: var(--terracotta); color: var(--terracotta-dark); }
+
+/* ---------- Rental assistant ---------- */
+.rent-bot-launcher { position: fixed; z-index: 7; left: 24px; bottom: 24px; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--paper); box-shadow: 0 10px 30px rgba(23,30,26,.16); text-align: left; cursor: pointer; }
+.rent-bot-launcher span:last-child { display: grid; gap: 1px; }
+.rent-bot-launcher b { font-size: 12px; }
+.rent-bot-launcher small { color: var(--muted); font-size: 10px; }
+.rent-bot-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--terracotta); box-shadow: 0 0 0 4px #f5e5de; }
+.rent-bot { position: fixed; z-index: 9; left: 24px; bottom: 24px; width: min(370px, calc(100vw - 32px)); height: min(520px, calc(100svh - 48px)); display: grid; grid-template-rows: auto 1fr auto auto; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); box-shadow: 0 24px 60px rgba(23,30,26,.28); }
+.rent-bot > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #202b25; color: #fff; }
+.rent-bot > header div { display: grid; gap: 2px; }
+.rent-bot > header small { color: rgba(255,255,255,.6); font-size: 10px; }
+.rent-bot > header button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font-size: 18px; cursor: pointer; }
+.rent-bot-stream { display: flex; flex-direction: column; gap: 10px; padding: 14px; overflow-y: auto; background: #fbfaf6; }
+.rent-bot-msg { max-width: 88%; padding: 10px 12px; border-radius: 14px; font-size: 12.5px; line-height: 1.55; }
+.rent-bot-msg p { margin: 0 0 8px; }
+.rent-bot-msg p:last-child { margin: 0; }
+.rent-bot-msg.assistant { align-self: flex-start; border: 1px solid var(--line); background: #fff; }
+.rent-bot-msg.user { align-self: flex-end; background: var(--terracotta); color: #fff; }
+.rent-bot-msg.typing { color: var(--muted); font-style: italic; }
+.rent-bot-suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 0; }
+.rent-bot-suggestions button { padding: 6px 10px; border: 1px solid #d6d2c9; border-radius: 99px; background: #fff; font-size: 11px; cursor: pointer; }
+.rent-bot-suggestions button:hover:not(:disabled) { border-color: var(--terracotta); color: var(--terracotta-dark); }
+.rent-bot-form { display: flex; gap: 8px; padding: 10px 12px 12px; }
+.rent-bot-form input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid #d8d4cc; border-radius: 10px; background: #f8f6f1; font: inherit; font-size: 12.5px; }
+.rent-bot-form input:focus { outline: 0; border-color: var(--terracotta); }
+.rent-bot-form button { padding: 0 14px; border: 0; border-radius: 10px; background: var(--terracotta); color: #fff; font-weight: 700; cursor: pointer; }
+.rent-bot-form button:disabled { opacity: .4; cursor: default; }
+
+/* ---------- Settling-in plan ---------- */
+.plan-screen { max-width: 980px; margin: 0 auto; padding: 36px 5vw 120px; }
+.plan-hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+.plan-hero h1 { margin: 0 0 10px; font: 500 clamp(32px, 4vw, 46px)/1.08 "Playfair Display", serif; }
+.plan-hero p { max-width: 520px; margin: 0; color: var(--muted); line-height: 1.6; }
+.plan-progress { min-width: 150px; display: grid; gap: 4px; }
+.plan-progress b { font: 500 34px "Playfair Display", serif; }
+.plan-progress span { color: var(--muted); font-size: 12px; }
+.plan-progress > i { display: block; height: 6px; overflow: hidden; border-radius: 99px; background: #ddd8cf; }
+.plan-progress > i > i { display: block; height: 100%; background: var(--terracotta); transition: width .3s; }
+.plan-phases { display: grid; gap: 22px; }
+.plan-phase { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+.plan-phase h2 { margin: 0 0 14px; font: 500 22px "Playfair Display", serif; }
+.plan-step { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.plan-step:first-of-type { border-top: 0; }
+.plan-step input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--terracotta); }
+.plan-step span { display: grid; gap: 4px; }
+.plan-step b { font-size: 14px; }
+.plan-step small { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+.plan-step.done b { color: var(--muted); text-decoration: line-through; }
+.plan-link { justify-self: start; padding: 0; border: 0; background: none; color: var(--terracotta-dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+
+@media (max-width: 760px) {
+  .my-listing { grid-template-columns: 1fr auto; }
+  .my-listing-actions { grid-column: 1 / -1; }
+  .narrative-cols { grid-template-columns: 1fr; }
+  .rent-bot-launcher { bottom: 78px; left: 14px; }
+  .rent-bot { left: 16px; bottom: 78px; height: min(480px, calc(100svh - 110px)); }
+  .chat-quick-actions { padding: 8px 13px 0; }
+  .listing-form-modal .form-row { grid-template-columns: 1fr; }
+  .plan-screen { padding-bottom: 110px; }
 }

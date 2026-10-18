@@ -1,5 +1,6 @@
 import { Router } from "express"
 import { z } from "zod"
+import { requireUser, type AuthedRequest } from "../auth.js"
 import {
   getPropertyLatLng,
   queryListings,
@@ -7,8 +8,7 @@ import {
 } from "../data/query-listings.js"
 import { geocode } from "../geo/nominatim.js"
 import { nearbyPlaces, type NearbyPlaceType } from "../geo/overpass.js"
-import { parseBboxParam } from "../lib/bbox.js"
-import { config } from "../config.js"
+import { mapStatusToDb, parseBboxParam } from "../lib/bbox.js"
 import { getSupabaseAdmin } from "../supabase-client.js"
 
 export const listingsRouter = Router()
@@ -81,28 +81,23 @@ listingsRouter.get("/:id/nearby", async (req, res) => {
   return res.json({ places, radiusMeters: radius })
 })
 
-const writeBodySchema = z.object({
-  title_en: z.string().min(1),
-  address: z.string().min(1),
-  district: z.string().min(1),
-  monthly_rent: z.number().positive(),
-  bedrooms: z.number().int().min(0),
-  bathrooms: z.number().int().min(0),
-  area_sqft: z.number().positive(),
-  property_type: z.string().min(1),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  landlord_id: z.string().uuid(),
+const createBodySchema = z.object({
+  title_en: z.string().min(1).max(160),
+  address: z.string().min(1).max(240),
+  district: z.string().min(1).max(80),
+  monthly_rent: z.number().positive().max(1_000_000),
+  bedrooms: z.number().int().min(0).max(20),
+  bathrooms: z.number().int().min(0).max(20),
+  area_sqft: z.number().positive().max(20_000),
+  property_type: z.string().min(1).max(40),
+  latitude: z.number().min(21).max(23).optional(),
+  longitude: z.number().min(113).max(115).optional(),
 })
 
-listingsRouter.post("/", async (req, res) => {
-  if (!config.supabaseServiceRoleKey) {
-    return res.status(503).json({
-      error:
-        "Listing create requires SUPABASE_SERVICE_ROLE_KEY in backend/server/.env.local",
-    })
-  }
-  const parsed = writeBodySchema.safeParse(req.body)
+/** Create a listing owned by the signed-in landlord (id comes from the verified JWT). */
+listingsRouter.post("/", requireUser, async (req, res) => {
+  const { userId } = req as AuthedRequest
+  const parsed = createBodySchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() })
   }
@@ -122,10 +117,12 @@ listingsRouter.post("/", async (req, res) => {
   }
 
   const sb = getSupabaseAdmin()
+  await sb.from("profiles").update({ role: "landlord" }).eq("id", userId)
+
   const { data, error } = await sb
     .from("properties")
     .insert({
-      landlord_id: body.landlord_id,
+      landlord_id: userId,
       title_en: body.title_en,
       district: body.district,
       address: body.address,
@@ -145,40 +142,73 @@ listingsRouter.post("/", async (req, res) => {
   return res.status(201).json({ id: data.id, latitude: lat, longitude: lng })
 })
 
-listingsRouter.patch("/:id", async (req, res) => {
-  if (!config.supabaseServiceRoleKey) {
-    return res.status(503).json({ error: "PATCH requires SUPABASE_SERVICE_ROLE_KEY" })
+const patchBodySchema = z
+  .object({
+    title_en: z.string().min(1).max(160),
+    address: z.string().min(1).max(240),
+    district: z.string().min(1).max(80),
+    monthly_rent: z.number().positive().max(1_000_000),
+    bedrooms: z.number().int().min(0).max(20),
+    bathrooms: z.number().int().min(0).max(20),
+    latitude: z.number().min(21).max(23),
+    longitude: z.number().min(113).max(115),
+    /** API status: available | rented | hidden */
+    status: z.enum(["available", "rented", "hidden"]),
+  })
+  .partial()
+
+/** Update a listing — only its owner may do so. */
+listingsRouter.patch("/:id", requireUser, async (req, res) => {
+  const { userId } = req as AuthedRequest
+  const parsed = patchBodySchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() })
   }
-  const address = req.body.address as string | undefined
-  if (address && req.body.latitude == null && req.body.longitude == null) {
-    const geo = await geocode(`${address}, Hong Kong`)
+  const body = { ...parsed.data }
+
+  if (body.address && body.latitude == null && body.longitude == null) {
+    const geo = await geocode(`${body.address}, Hong Kong`)
     if (!geo) {
       return res.status(422).json({ error: "Geocoding failed for new address" })
     }
-    req.body.latitude = geo.lat
-    req.body.longitude = geo.lng
+    body.latitude = geo.lat
+    body.longitude = geo.lng
   }
 
-  const allowed = [
-    "title_en",
-    "address",
-    "district",
-    "monthly_rent",
-    "bedrooms",
-    "bathrooms",
-    "latitude",
-    "longitude",
-  ] as const
-  const patch: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (req.body[key] !== undefined) patch[key] = req.body[key]
-  }
+  const { status, ...rest } = body
+  const patch: Record<string, unknown> = { ...rest }
+  if (status) patch.status = mapStatusToDb(status)
   if (!Object.keys(patch).length) {
     return res.status(400).json({ error: "No fields to update" })
   }
 
-  const sb = getSupabaseAdmin()
-  const { error } = await sb.from("properties").update(patch).eq("id", req.params.id)
+  const { data, error } = await getSupabaseAdmin()
+    .from("properties")
+    .update(patch)
+    .eq("id", req.params.id)
+    .eq("landlord_id", userId)
+    .select("id")
+
   if (error) return res.status(500).json({ error: error.message })
+  if (!data?.length) {
+    return res.status(404).json({ error: "Listing not found or not yours" })
+  }
+  return res.json({ ok: true })
+})
+
+/** Remove a listing from the public map (soft delete → archived). */
+listingsRouter.delete("/:id", requireUser, async (req, res) => {
+  const { userId } = req as AuthedRequest
+  const { data, error } = await getSupabaseAdmin()
+    .from("properties")
+    .update({ status: "archived" })
+    .eq("id", req.params.id)
+    .eq("landlord_id", userId)
+    .select("id")
+
+  if (error) return res.status(500).json({ error: error.message })
+  if (!data?.length) {
+    return res.status(404).json({ error: "Listing not found or not yours" })
+  }
   return res.json({ ok: true })
 })

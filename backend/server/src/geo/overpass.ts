@@ -73,7 +73,7 @@ export async function nearbyPlaces(
       elements: Array<{
         lat?: number
         lon?: number
-        tags?: { name?: string }
+        tags?: { name?: string; amenity?: string; shop?: string }
       }>
     }
 
