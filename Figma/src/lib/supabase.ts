@@ -49,35 +49,25 @@ function buildClient(): SupabaseClient | null {
   }
 }
 
+// Single eagerly-built client shared by every consumer. `getSupabase()` returns
+// this same instance so there is exactly one client (and one auth session) in
+// the app regardless of which module asks for it.
 export const supabase: SupabaseClient | null = buildClient();
 
-export const isSupabaseConfigured = supabase !== null;
-
 export const backendMode: "supabase" | "local" = supabase ? "supabase" : "local";
-import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-let client: SupabaseClient | null = null
-
+/** True when a usable Supabase project is configured and the client built. */
 export function isSupabaseConfigured(): boolean {
-  return Boolean(url && anonKey)
+  return supabase !== null;
 }
 
 /** Shared browser client (persists the landlord session in localStorage). */
 export function getSupabase(): SupabaseClient | null {
-  if (!url || !anonKey) return null
-  if (!client) {
-    client = createClient(url, anonKey, {
-      auth: { persistSession: true, autoRefreshToken: true },
-    })
-  }
-  return client
+  return supabase;
 }
 
 export type AmenityRow = {
-  id: string
-  name_en: string
-  name_zh: string
-}
+  id: string;
+  name_en: string;
+  name_zh: string;
+};
