@@ -4,184 +4,167 @@
 
 Hackathon entry · Track 3: Smart Living, Culture & Belonging · SDG 11
 
-> ### ⚠️ Branch note (`AI-random-bs-go`)
-> This is a **solo methodology experiment**, not the team's working branch. The
-> team's planning docs (`PRD.md`, `TEAM-BRIEF.md`, `docs/site-spec-suite/`, …) were
-> **removed here on purpose** — they had drifted into three contradictory statements
-> of the product, and this branch replaces them with a validated intent tree in
-> [`vault/`](vault/). **`main` still holds every removed file**; restore any with
-> `git checkout main -- <path>`.
+> ### ⚠️ Branch note
+> You are on **`AI-random-bs-go`**. **`main` is the stable trunk** (pre-merge base) —
+> all new work is built and tested here first, then merged into `main`. Do not push
+> experimental work directly to `main`.
 >
-> The surviving primary sources are the team-agreed interim report and the `Figma/`
-> export. See [`vault/NOTES.md`](vault/NOTES.md) for the reasoning.
+> The planning docs that used to live at the repo root (`PRD.md`, `TEAM-BRIEF.md`)
+> were removed on this branch on purpose; `main` still holds them. The validated
+> intent and contracts now live in [`vault/`](vault/) (quarantined from the product
+> and the pitch). See [`vault/NOTES.md`](vault/NOTES.md) for the reasoning.
 
 ---
 
-## Start here
+## Read this first: what is real vs. synthesised
 
-| If you want to... | Read |
+The one rule of this repo: **say what is true**. The full ledger is
+[`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) §7 — read it before any demo.
+The short version:
+
+| Real | Synthesised / demo-only |
 |---|---|
-| **Know the agreed position** — the team's interim report | [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) |
-| **Know what the product is meant to be** — the validated intent tree | [`vault/ips/IP.rentmate.v3.md`](vault/ips/IP.rentmate.v3.md) |
-| **Know what actually ships vs. what is a demo stub** — the honesty ledger | [`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) §7 |
-| **See the agent's honest take** — the drift found, what was overruled, what was deleted | [`vault/NOTES.md`](vault/NOTES.md) |
-| **See the contracts** (deterministic functions, with test oracles) | [`vault/cps/`](vault/cps/) |
-| **Run the hackathon demo** | [`docs/demo-user-guide.md`](docs/demo-user-guide.md) — start in the **`Figma/`** app |
-| **Put it on a public URL** — the deck needs a clickable link | [`docs/HOSTING.md`](docs/HOSTING.md) |
-| **Set up or repair the database** | [`backend/supabase/SETUP.md`](backend/supabase/SETUP.md) |
-| Read the original deck and raw survey | [`docs/GenAI.pdf`](docs/GenAI.pdf) · [`docs/SURVEY.pdf`](docs/SURVEY.pdf) |
+| University-domain eligibility gate (exact dot-boundary match) | **Every candidate profile** — seeded data |
+| The scoring contract `CP.calculate_match.v2` (8/8 oracle) | **Every "AI" feature** — rule-based placeholder, badged in the UI |
+| In-app chat persisted to Postgres, delivered over Supabase Realtime | **All listings** — no public HK per-listing API exists; 72 synthetic flats locally, 50 seeded to the DB |
+| Report + block (a block hides the chat for **both** sides) | Conversation replies, hook deck, district guides, safety notes |
+| Landlord listing CRUD with server-enforced ownership | The 3D walkthrough — stock photos, captioned as a mock |
+| The account reloads on mount, **no sessions** | Verification is **domain-only** — no email sent, nothing stored |
 
-**Key dates:** build + submission both **~18 October** · **code freeze 14 October**.
-| | |
+`VITE_GENAI_MODE=api` swaps the placeholder for a real LLM backend without
+touching the UI — the three endpoints are listed in
+[`Figma/src/lib/genai/index.ts`](Figma/src/lib/genai/index.ts).
+
+---
+
+## What the app is
+
+**Two audiences, one app** (`Figma/`, run on port **8443**):
+
+**Students** (the primary path — everything here works offline):
+
+```
+/ (Home) → /verify → /quiz → /matches
+```
+
+| Route | What happens |
 |---|---|
-| **Hackathon** | GENAI for SDG · **Track 3 — Smart Living, Culture & Belonging** |
-| **SDG** | **11** — Sustainable cities and communities |
-| **Status** | **Entry granted** · demo-ready build on `main` (localhost accepted by organisers) |
-| **Team repo** | [GenAI4SDG/rentMate](https://github.com/GenAI4SDG/rentMate) |
+| `/` | Landing. Student CTA leads; the owner CTA is secondary. |
+| `/verify` | Email gate — 12 institutions / 41 domains, exact match. No password, no OTP, no session. |
+| `/quiz` | **20 questions across 17 pages** → profile: six lifestyle scalars, MBTI inferred from behaviour (never shown as a code), budget, areas. |
+| `/matches` | Hook deck (one real shared detail per match, not a ranked grid) → chat with a **compatibility narrative** → **Find a flat** (Leaflet/OSM map + district price context) → **My plan** settling-in checklist. `demo@` / `admin@` local parts unlock the curated demo cast / review queue. |
 
-**Four focuses (pitch order):** compatibility → affordability → transparency → safety (university-gated access).
+**Landlords / flat owners** (secondary path — needs the backend to be *live*, or runs read-only):
 
-Product authority for scope and ethics: [`docs/GENAI SDG interim draft.pdf`](docs/GENAI%20SDG%20interim%20draft.pdf) · details in [`PRD.md`](PRD.md).
+```
+/landlord-entry → /landlord-dashboard
+```
 
----
+| Route | What happens |
+|---|---|
+| `/landlord-entry` | Real **Supabase Auth** sign-up/sign-in, **or** the one-click **demo owner** — a local-only sign-in that works with no backend at all (writes the session to the browser; the dashboard then shows the synthetic pool read-only, badged *Demo mode*). |
+| `/landlord-dashboard` | Add / mark rented / relist / remove listings, ownership enforced server-side. |
 
-## What works today
+## How it is actually wired
 
-**What the shipped build actually uses** (as of 14 Oct — see
-[`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) §7 for the full ledger):
+**Supabase — Postgres + Realtime, and Auth for owners only.**
 
-- **Vite + React 19 + TypeScript** ✅ typecheck clean, production build green
-- **Supabase — Postgres + Realtime only.** Chat is persisted and delivered live.
-- **No Supabase Auth.** The email is the account key, checked client-side
-  against an institution allowlist. No password, no OTP, no session.
-- **RLS is disabled** on all eight tables (no `auth.users` ⇒ no `auth.uid()` to key
-  a policy on). Demo-only trade, documented in [`SETUP.md`](backend/supabase/SETUP.md).
-- **No GenAI API is called anywhere.** Every AI-shaped feature is pre-written
-  content badged "AI · demo" in the UI.
-- **Chat and video are built in-house and stay in-app** — contact details are
-  never exchanged, and there is no Google Meet hand-off.
-- **Hosted as static files.** The organisers accept a localhost build, but the
-  submission deck needs a **clickable link**, so a public URL is required —
-  see [`docs/HOSTING.md`](docs/HOSTING.md). The app is `dist/` plus assets; no
-  server process is deployed.
+- **Students have no Auth.** The **email is the account key** (`roommate_profiles` PK).
+  Profiles, messages, reports and blocks are written directly with the anon client;
+  chat is delivered over `postgres_changes`. **RLS is disabled on the eight demo
+  tables** — documented, and safe only because the data is synthetic
+  ([`backend/supabase/SETUP.md`](backend/supabase/SETUP.md)).
+- **Landlords use real Supabase Auth** (`signUp` / `signInWithPassword`) and the map
+  API verifies listing ownership on every write.
+- **Everything degrades to the browser.** With no `Figma/.env.local` the app runs in
+  **local mode** — the whole student flow works from `localStorage`. The **Live
+  database check** card on the home page (`#backend`) is the visible signal: it says
+  *Not configured* and prints the exact fix when the variables are missing, so a
+  silently-ignored env var can never fake a save.
 
-> Earlier revisions of this section described Supabase Auth, Edge-Function
-> GenAI calls and a Google Meet hand-off. None of those ship. They are kept out
-> of the codebase rather than left as aspirational comments.
-The **main demo** lives in **`Figma/`** (React 19 + Vite, port **8443**). It serves **two audiences**:
+**Map API (`backend/server`, port 3001).** Serves `/api/listings`,
+`/api/listings/:id/nearby`, `/api/geocode`, `/api/health`, and the landlord routes.
+With env + seed the map shows **50 Hong Kong listings**.
 
-- **Student tenants** — verify email (demo gate) → lifestyle quiz → seeded roommate matches with a **compatibility summary** → messages with Google Meet / viewing-meetup shortcuts → **Find a flat** on OpenStreetMap with **price context** → **My plan** settling-in checklist → **Ask Rent Mate** assistant.
-- **Landlords / flat owners** — real **Supabase Auth** sign-up / sign-in → dashboard to **add, mark rented, relist and remove** listings (server-verified ownership). Seed owner **testing** has 50 listings.
+**Offline fallback (no backend required).** When the map API is unreachable the map
+falls back to the synthetic pool: pins inside the viewport, the same price/bedroom
+filters, district search, and a **"Demo listings · map API offline — retry"** badge
+that re-probes when you start the backend. The UI always says which pool you are
+looking at — see [`Figma/src/lib/demoListings.ts`](Figma/src/lib/demoListings.ts).
 
-There are **two** npm projects in this repo with **different scripts**. Read the
-heading before you copy a command.
-
-### The demo app — `Figma/` (this is the product)
-The AI features run on a **rule-based placeholder** behind a single provider interface (`Figma/src/lib/genai/`); set `VITE_GENAI_MODE=api` to plug in a real LLM backend without touching the UI.
-
-**`backend/`** — Supabase Postgres (HK rental schema, RLS), **map API** (`backend/server`, port **3001**), and **Edge Function stubs** for a future rental chatbot and agreement review. With env + seed, the map shows **50 Hong Kong listings**; the home page can load **12 amenities** live from Supabase.
-
-Root **`src/`** is a thin shell for later merge of the Figma UI — not the judge path.
-
----
-
-## Feature checklist (planned vs built)
-
-Aligned to [`docs/pitch-and-data-pack.md`](docs/pitch-and-data-pack.md) §1.1. Legend: ✅ demo-ready · 🟡 partial / prototype · ⬜ not wired in app yet.
-
-| ID | Feature | Status | Notes |
-|----|---------|--------|--------|
-| **F1** | Student verification (university email) | 🟡 | Domain check + session in browser; **not** Supabase Auth / mailbox proof |
-| **F2** | Lifestyle + housing quiz | ✅ | 7-question flow in `Figma/src/App.tsx` |
-| **F3** | Roommate matching + **compatibility narrative** | 🟡 | Seeded profiles; weighted score (not AI); narrative is a **rule-based placeholder** in the UI — LLM swap-in ready (`VITE_GENAI_MODE=api`) |
-| **F4** | Listing layer + neighbourhood transparency | 🟡 | **Real** map listings, nearby POIs, **district price context** (vs. median of listings); mock 3D tour; official R&VD data not integrated |
-| **F4+** | Landlord list & manage on map | ✅ | Supabase Auth, create / mark rented / relist / remove, ownership enforced server-side, seed owner **testing** (hackathon extension) |
-| **F5** | Chat + video | 🟡 | In-app **demo** messaging + **Google Meet** handoff; no real-time delivery between users |
-| **F6** | Extended flat-viewing meetup | 🟡 | “Propose a viewing meetup” shortcut in chat; no group scheduling yet |
-| **F7** | Generated settling-in plan | 🟡 | **My plan** tab, personalised from quiz answers (placeholder generator) |
-| **F8** | Multilingual layer | 🟡 | DB amenities EN/中文; UI mostly English |
-| — | **Supabase schema + RLS** | ✅ | Migrations under `backend/supabase/migrations/` |
-| — | **GenAI rental chatbot** | 🟡 | “Ask Rent Mate” widget live with a rule-based FAQ placeholder; Edge Function stub + `OPENAI_API_KEY` needed for the real model |
-| — | **Deploy + CI** | ✅ | `render.yaml`, `Figma/vercel.json`, GitHub Actions build/test; auto-redeploy on push |
-| — | **Agreement AI review** | 🟡 | Edge Function stub only |
-| — | **Roommate data in Postgres** | ⬜ | Quiz/matches still client demo data, not HK rental tables |
-
-**Demo honesty:** Say aloud that **roommate profiles are seeded**; **map listings** are real when the map API is running and seed has been applied.
+**GenAI.** `VITE_GENAI_MODE=mock` (default) = rule-based placeholder, no keys,
+works offline. If the API is down the UI silently falls back to the placeholder, so
+a demo never shows an error.
 
 ---
 
 ## Quick start
 
-### Judges / teammates (UI only)
+### UI only (no backend — this is the judge path)
 
 ```bash
 cd Figma
 npm install
-cp .env.example .env.local   # optional — see below
-npm run dev
-# → http://localhost:8443
+npm run dev          # → http://localhost:8443
 ```
 
-Opens on **<http://localhost:8443>** (not 5173 — `Figma/vite.config.ts` sets
-`port: 8443` with `strictPort: true`, so if 8443 is taken the server **fails**
-rather than picking another port).
+`port: 8443` is `strictPort` — if it is taken the server **fails** rather than
+picking another port. Sign in as **`demo@cuhk.edu.hk`** for the curated cast, or any
+`@<institution>.edu.hk` address from the allowlist for the generic pool.
 
-Sign in as **`demo@cuhk.edu.hk`** for the curated cast, or any
-`@<hk-institution>.edu.hk` address from the allowlist for the generic pool.
+### Full stack (map + 50 HK pins + real Supabase)
 
-**No backend is required.** With `.env.local` absent or blank the app runs in
-**local mode** — the whole flow works, data lives in the browser. To connect
-Supabase, put these in `Figma/.env.local` and restart:
+See **[`docs/demo-user-guide.md`](docs/demo-user-guide.md)** — env files,
+`supabase db push`, the map API, `npm run seed:listings`, owner sign-in.
+
+```bash
+cd backend/server && npm install && npm run dev   # terminal 1 — port 3001
+cd Figma && npm run dev                           # terminal 2 — port 8443
+```
+
+To connect Supabase, put these in `Figma/.env.local` and restart (the `VITE_`
+prefix is mandatory — Vite silently ignores `NEXT_PUBLIC_*` names and the app falls
+back to local mode with no error):
 
 ```
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<publishable / anon key>
+VITE_SUPABASE_ANON_KEY=<anon key>
 ```
-
-> **The `VITE_` prefix is mandatory.** Vite silently ignores `NEXT_PUBLIC_*`
-> names, which makes the app fall back to local mode with no error. The header
-> shows which mode you are in — if it says `local` when you expected `supabase`,
-> the variables did not reach the build.
-
-### The root app shell — repo root (integration placeholder)
-
-A five-file stub, not the product. Only run this if you are working on the
-integration shell.
-Optional: `Figma/.env.local` from `Figma/.env.example` for the **Live database check** on the home page.
-
-### Full stack (map + 50 HK pins)
-
-See **[`docs/demo-user-guide.md`](docs/demo-user-guide.md)** — env files, `supabase db push`, map API, `npm run seed:listings`, owner sign-in.
 
 ### Public URL (Vercel + Render)
 
-**Start here:** **[`docs/go-live.md`](docs/go-live.md)** — hackathon checklist (~15 min).  
-Full setup, GenAI notes, and troubleshooting: **[`docs/demo-user-guide.md`](docs/demo-user-guide.md)** (*Put it online*).
+**Start here:** **[`docs/go-live.md`](docs/go-live.md)** (~15 min checklist).
+Full setup and troubleshooting: **[`docs/HOSTING.md`](docs/HOSTING.md)**.
+One-shot option: [`render.yaml`](render.yaml) on Render Blueprint — two services,
+`rentmate-map-api` (Node) and `rentmate-web` (static, SPA rewrite). Set
+**`VITE_MAP_API_URL`** on the site to the API's URL after the first deploy.
 
-Host **UI** from `Figma/` and **map API** from `backend/server/`. Set **`VITE_MAP_API_URL`** when building the frontend. Optional one-shot: [`render.yaml`](render.yaml) on Render Blueprint.
+---
 
-```bash
-# Terminal 1
-cd backend/server && npm install && npm run dev
+## Feature checklist
 
-# Terminal 2
-cd Figma && npm run dev
-```
+Legend: ✅ demo-ready · 🟡 partial / prototype · ⬜ not wired in app yet.
 
-### The backend — `backend/`
+| ID | Feature | Status | Notes |
+|----|---------|--------|-------|
+| F1 | Student verification (university email) | 🟡 | Domain gate + email-as-account-key; **not** mailbox proof, and nothing is stored to attest it |
+| F2 | Lifestyle + housing quiz | ✅ | **20 questions / 17 pages** in `lib/quiz.ts` + `pages/Quiz.tsx` |
+| F3 | Roommate matching + compatibility narrative | 🟡 | Seeded profiles; deterministic score contract; narrative is a rule-based placeholder, LLM-swap ready |
+| F4 | Listing layer + neighbourhood transparency | 🟡 | Real map listings when the API runs, **offline demo fallback** when it doesn't; nearby POIs optional; district price context vs. the loaded pool; mock 3D tour |
+| F4+ | Landlord list & manage on map | ✅ | Supabase Auth, create / mark rented / relist / remove, ownership enforced server-side; demo owner signs in locally |
+| F5 | Chat | 🟡 | Real in-app messaging (Postgres + Realtime) with optional Google Meet / viewing-meetup shortcuts; no video built in-app |
+| F6 | Viewing meetup | 🟡 | Shortcut in chat; no group scheduling |
+| F7 | Generated settling-in plan | 🟡 | `My plan`, personalised from quiz answers (placeholder generator) |
+| F8 | Multilingual | 🟡 | Amenities EN/中文 in the DB; UI mostly English |
+| — | Supabase schema | ✅ | 6 migrations, `2026-03-13` → `2026-10-14` |
+| — | Moderation (report / block) | ✅ | Real tables; block hides both sides; review queue is **read-only** — no un-block, no resolution |
+| — | GenAI rental chatbot | 🟡 | Rule-based placeholder; Edge Function stubs exist for a real model |
+| — | Deploy | ✅ | `render.yaml`, `Figma/vercel.json`, GitHub Actions build |
+| — | Roommate data in Postgres | ✅ | `roommate_profiles` keyed on email, upserted when Supabase is configured |
 
-Not a service you run for the demo. See
-[`backend/supabase/SETUP.md`](backend/supabase/SETUP.md).
-
-## Stack
-
-| Layer | Choice |
-|-------|--------|
-| Frontend | Vite 8, React 19, TypeScript (`Figma/`) |
-| Backend | Supabase (Auth, Postgres, Storage, Edge Functions) |
-| Map | Leaflet, OSM tiles, Express map API, Nominatim / Overpass |
-| GenAI (target) | GPT-4o-mini in Edge Functions — compatibility narrative + grounded chatbot (keys server-side only) |
-| Demo | **localhost** (organiser-confirmed); no deploy required |
+**Demo honesty, say it aloud:** the roommate profiles are **seeded**; the map
+listings are real when the map API is running and seeded, and the synthetic demo
+pool when it isn't (the badge tells you which); every "AI" feature is pre-written.
 
 ---
 
@@ -189,15 +172,17 @@ Not a service you run for the demo. See
 
 | Path | Role |
 |------|------|
-| [`Figma/`](Figma/) | Hackathon demo UI |
-| [`backend/supabase/`](backend/supabase/) | Migrations, Edge Functions |
-| [`backend/server/`](backend/server/) | Map API, geocode, listing CRUD, seed scripts |
-| [`docs/demo-user-guide.md`](docs/demo-user-guide.md) | Setup, troubleshooting, demo script |
-| [`backend/README.md`](backend/README.md) | Supabase + map API reference |
-| [`TEAM-BRIEF.md`](TEAM-BRIEF.md) | Decisions, roles, calendar |
-| [`PRD.md`](PRD.md) | Full product requirements |
-
----
+| [`Figma/`](Figma/) | **The product** — React 19 + Vite 8 + TypeScript, pages + router |
+| [`Figma/src/pages/`](Figma/src/pages/) | `Home` · `Verify` · `Quiz` · `Matches` (landlord routes render `components/Landlord*`) |
+| [`Figma/src/lib/`](Figma/src/lib/) | `quiz`, `matching` (score + hard gates), `listings` (synthetic pool), `demoListings` (offline fallback), `api` (Supabase surface), `landlordApi`, `genai` |
+| [`backend/server/`](backend/server/) | Map API — listings, geocode, landlord CRUD, seed scripts (port 3001) |
+| [`backend/supabase/`](backend/supabase/) | Migrations, Edge Function stubs, `SETUP.md` |
+| [`docs/demo-user-guide.md`](docs/demo-user-guide.md) | Full setup, troubleshooting, demo script |
+| [`docs/HOSTING.md`](docs/HOSTING.md) · [`docs/go-live.md`](docs/go-live.md) | Public URL, deploy breakers |
+| [`FEATURE_LEDGER.md`](FEATURE_LEDGER.md) | Every feature request and what happened to it — the negative rows matter |
+| [`SUBMISSION_REPORT.md`](SUBMISSION_REPORT.md) | External-review brief; §7 = the honesty ledger |
+| [`vault/`](vault/) | Intent + contracts (`IP.rentmate.v3`, `CP.*`), quarantined from the product |
+| [`src/`](src/) | 5-file integration stub at the repo root — **not** the judge path |
 
 ## Development
 
@@ -211,69 +196,43 @@ npm run lint        # eslint
 **From `Figma/`:**
 
 ```bash
-npm run build       # before each Friday demo
-npm run smoke       # 51 assertions on the invariants TS cannot see
+npm run build       # before each Friday demo — Vite does NOT typecheck
+npm run smoke       # 66 assertions on the invariants TS cannot see
 npx tsc --noEmit    # there is no typecheck script in Figma/
 ```
 
-> **`Figma/package.json` has only `dev`, `build`, `preview`, `format` and
-> `smoke`.** `npm run typecheck` and `npm run lint` exist at the **root** only,
-> so running them inside `Figma/` fails with "Missing script". Typechecking the
-> app is `npx tsc --noEmit` from `Figma/`.
-
-> **Vite does not typecheck.** `npm run dev` will happily serve code with type errors. Without a typecheck the editor is your only safety net and broken code reaches `main`.
+`Figma/package.json` has only `dev`, `build`, `preview`, `format` and `smoke`;
+`typecheck`/`lint` exist at the root only, so running them inside `Figma/` fails
+with "Missing script".
 
 ## Hosting
 
-The submission deck needs a **clickable link**, so the app has to be reachable on
-a public URL — localhost cannot go in a slide.
+The deck needs a **clickable link**, so the app has to be reachable publicly:
 
 ```bash
-cd Figma
-npm run build          # produces Figma/dist/
+cd Figma && npm run build    # → Figma/dist/
 ```
 
-Then upload `Figma/dist/` to any static host. Full instructions, including the
-three things that silently break a deploy, are in
-[`docs/HOSTING.md`](docs/HOSTING.md). The two that catch people:
+The two things that silently break a deploy (both covered in
+[`docs/HOSTING.md`](docs/HOSTING.md)):
 
-- **Env vars are baked in at build time, and `.env.local` is gitignored** — a
-  host that builds from Git produces a local-mode app unless you set
-  `VITE_SUPABASE_*` in its dashboard. Building locally and uploading `dist/`
-  sidesteps this entirely.
-- **Subpath hosting needs `FIGMA_PUBLIC_URL`** — e.g. GitHub Pages at
-  `/rentMate/` requires `FIGMA_PUBLIC_URL=/rentMate npm run build`, or every
-  asset 404s.
+- **Env vars are baked in at build time and `.env.local` is gitignored** — a host
+  that builds from Git produces a local-mode app unless `VITE_SUPABASE_*` and
+  `VITE_MAP_API_URL` are set in its dashboard. Building locally and uploading
+  `dist/` sidesteps this.
+- **Subpath hosting needs `FIGMA_PUBLIC_URL`** — e.g. GitHub Pages at `/rentMate/`
+  requires `FIGMA_PUBLIC_URL=/rentMate npm run build`, or every asset 404s.
 
 > ⚠️ The anon key ships inside the bundle and RLS is off, so **anyone with the
-> link can read and write every row**. That is acceptable only because the data
-> is synthetic. Do not put a real person's details in this database while the
-> link is public.
-# Figma app
-cd Figma && npm run build
+> link can read and write every row**. Acceptable only because the data is
+> synthetic. Do not put a real person's details in this database while public.
 
-# Map API tests
-cd backend/server && npm test
-```
+## Conventions
 
-Before sharing `main`: run `npm run build` in `Figma/` (Vite does not typecheck on `dev`).
-
-**Secrets:** only `*.env.example` is committed — copy to `.env.local`. Never commit keys.
-
-**Branching:** `main` stays demo-able · one person per file · remote `GenAI4SDG/rentMate`.
-
-- **[`.workbuddy-ai/memory/MEMORY.md`](.workbuddy-ai/memory/MEMORY.md)** — the shared project brain. Update it when you *decide* something, not just when you build something.
-- **`.workbuddy-ai/skills/rentmate-conventions/`** — our stack, conventions, ethics rules and scope lock.
-
-## Reference (optional)
-
-## Branching
-
-Remote: `https://github.com/GenAI4SDG/rentMate`
-
-- `main` must always be demo-able
-- **One branch per person:** `p1/`, `p2/`, `p3/`
-- **One person per file** — AI tools edit files directly, so two people on one file collide
-- Tag a working demo every Friday: `git tag demo-w1`
-- `.env.example` is committed; `.env` is not
-Market research, judging scorecard, build plans: `docs/*.html`, [`docs/build-plans.md`](docs/build-plans.md), [`docs/pitch-and-data-pack.md`](docs/pitch-and-data-pack.md). Site spec draft: `docs/site-spec-suite/`.
+- `main` must always be demo-able · one branch per person · **one person per file**
+  (AI tools edit files directly, so two people on one file collide) · tag a working
+  demo every Friday: `git tag demo-wN`
+- `.env.example` is committed; `.env.local` is not. Never commit keys.
+- Update [`.workbuddy-ai/memory/MEMORY.md`](.workbuddy-ai/memory/MEMORY.md) when you
+  **decide** something, not just when you build something.
+- Team repo: [GenAI4SDG/rentMate](https://github.com/GenAI4SDG/rentMate)
