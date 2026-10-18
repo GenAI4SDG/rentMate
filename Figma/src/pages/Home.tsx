@@ -43,8 +43,8 @@ export default function Home({
             <em>kind of people.</em>
           </h1>
           <p className="hero-subtitle">
-            Students find compatible flatmates; landlords list homes on an
-            OpenStreetMap — one Hong Kong housing community.
+            Students find compatible flatmates and homes that actually fit —
+            one trusted Hong Kong housing community.
           </p>
           <div className="hero-role-grid" id="roles">
             <button type="button" className="hero-cta" onClick={onStartTenant}>
@@ -56,14 +56,17 @@ export default function Home({
                 <Icon name="arrow" />
               </span>
             </button>
+            {/* Demoted on purpose (owner's call, 18 Oct): students are the
+                audience this demo is built for; the owner flow is real but
+                secondary until verified sources land. Still reachable. */}
             <button
               type="button"
-              className="hero-cta hero-cta--landlord"
+              className="hero-cta hero-cta--secondary"
               onClick={onStartLandlord}
             >
               <span>
                 <b>I&apos;m a landlord or flat owner</b>
-                <small>List & manage properties on the map</small>
+                <small>List &amp; manage properties on the map</small>
               </span>
               <span className="cta-icon">
                 <Icon name="home" />

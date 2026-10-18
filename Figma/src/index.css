@@ -49,10 +49,7 @@ a { color: inherit; text-decoration: none; }
 .hero-subtitle { max-width: 610px; margin: 30px 0 34px; color: rgba(255,255,255,.68); font-size: clamp(17px, 1.45vw, 21px); line-height: 1.6; }
 .hero-role-grid { display: grid; gap: 14px; width: min(440px, 100%); }
 .hero-cta { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 15px 16px 15px 24px; border: 0; border-radius: 16px; background: var(--terracotta); color: #fff; text-align: left; cursor: pointer; transition: transform .2s, background .2s; }
-.hero-cta--landlord { background: #2d4a3e; }
-.hero-cta--landlord:hover { background: #243d33; }
 .hero-cta:hover { transform: translateY(-2px); background: #d27451; }
-.hero-cta--landlord:hover { background: #243d33; }
 .landlord-dashboard { background: var(--cream); min-height: 100svh; }
 .landlord-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; padding: 28px 5vw 8px; align-items: flex-end; }
 .landlord-header h1 { margin: 6px 0; font: 500 clamp(32px, 4vw, 48px)/1.08 "Playfair Display", serif; }
@@ -63,6 +60,12 @@ a { color: inherit; text-decoration: none; }
 .hero-cta span:first-child { display: grid; gap: 3px; }
 .hero-cta b { font-size: 16px; }
 .hero-cta small { color: rgba(255,255,255,.67); }
+/* Secondary role CTA — the owner path, demoted below the student flow
+   (owner's call, 18 Oct). Translucent on the dark hero so the student CTA
+   stays the only loud element. Must come after .hero-cta:hover to win the
+   equal-specificity race for background and transform. */
+.hero-cta--secondary { padding: 14px 15px 14px 23px; border: 1px solid rgba(255,255,255,.4); background: rgba(255,255,255,.08); }
+.hero-cta--secondary:hover { transform: translateY(-2px); background: rgba(255,255,255,.16); }
 .cta-icon { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.14); }
 .hero-stats { position: absolute; z-index: 1; right: 5vw; bottom: 35px; display: flex; gap: 30px; color: rgba(255,255,255,.65); font-size: 12px; }
 .hero-stats b { color: white; }
@@ -88,6 +91,9 @@ a { color: inherit; text-decoration: none; }
 .backend-check-stats span { font-size: 13px; color: var(--muted); }
 .backend-check-success { margin: 0 0 14px; color: #2d6a4f; font-size: 14px; line-height: 1.5; }
 .backend-check-error { margin: 0; padding: 12px 14px; border-radius: 10px; background: #fdecea; color: #9b2226; font-size: 14px; line-height: 1.5; }
+/* Landlord dashboard demo mode — amber, not red: nothing failed, the data is
+   just the synthetic pool because there is no live session to read from. */
+.demo-mode-note { margin: 0 5vw 4px; padding: 12px 14px; border-radius: 10px; background: #fbf3dd; color: #6f5410; font-size: 14px; line-height: 1.55; }
 .backend-check-amenities { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.7; }
 .backend-check-snippet { margin: 12px 0 0; padding: 14px; border-radius: 10px; background: #f3efe8; font-size: 12px; line-height: 1.5; overflow-x: auto; }
 
@@ -334,6 +340,11 @@ a { color: inherit; text-decoration: none; }
 .flats-search-header { display: grid; grid-template-columns: 1fr minmax(290px, 390px) auto; align-items: end; gap: 22px; padding: 20px 28px; border-bottom: 1px solid var(--line); background: var(--paper); }
 .flats-search-header .section-kicker { margin-bottom: 5px; font-size: 9px; }
 .flats-search-header h1 { margin: 0; font: 500 29px "Playfair Display", serif; }
+/* Shown when the map API is unreachable and the pins are the synthetic demo
+   pool. Deliberately a button: it doubles as the "retry live API" control. */
+.demo-source-badge { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; padding: 5px 12px; border: 1px solid #d9c58f; border-radius: 99px; background: #fbf3dd; color: #6f5410; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.demo-source-badge:hover { background: #f6e9c4; }
+.demo-source-badge .demo-dot { width: 7px; height: 7px; border-radius: 50%; background: #c19a2e; }
 .flats-search-header .search-box { height: 44px; }
 .map-filters { display: flex; gap: 6px; grid-column: 2 / -1; justify-content: flex-end; }
 .map-filters button { padding: 7px 11px; border: 1px solid #d4d0c8; border-radius: 99px; background: #f8f6f1; font-size: 9px; cursor: pointer; }

@@ -100,7 +100,9 @@ export const LISTING_DISTRICTS = [
 // Real district centroids, so the map pins sit where the district actually is.
 // Mirrors DISTRICT_COORDS in lib/matching.ts by hand — that file is deliberately
 // dependency-free so the oracle check can import it directly.
-const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
+// Exported so the offline geocode fallback (lib/demoListings.ts) can fly to a
+// district without a second copy of these coordinates.
+export const DISTRICT_CENTROIDS: Record<string, [number, number]> = {
   "Sha Tin": [22.382, 114.188],
   "Tai Wai": [22.373, 114.179],
   "Ma On Shan": [22.4247, 114.231],

@@ -3,7 +3,7 @@ import FlatsMapExplorer from "./FlatsMapExplorer"
 import ListingFormModal from "./ListingFormModal"
 import { getDisplayName, getStoredEmail } from "../lib/demo-session"
 import {
-  fetchOwnListings,
+  fetchOwnListingsResult,
   removeListing,
   setListingStatus,
   type OwnListing,
@@ -27,6 +27,8 @@ export default function LandlordDashboard({
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [mapVersion, setMapVersion] = useState(0)
+  /** True when the listings on screen are the synthetic pool, not live data. */
+  const [demoMode, setDemoMode] = useState(false)
 
   const name = getDisplayName() || "owner"
   const email = getStoredEmail()
@@ -35,7 +37,9 @@ export default function LandlordDashboard({
     setLoading(true)
     setError(null)
     try {
-      setListings(await fetchOwnListings())
+      const result = await fetchOwnListingsResult()
+      setListings(result.listings)
+      setDemoMode(result.source === "demo")
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not load your listings"
       setError(msg)
@@ -96,6 +100,12 @@ export default function LandlordDashboard({
           <button
             type="button"
             className="primary-button"
+            disabled={demoMode}
+            title={
+              demoMode
+                ? "Demo mode — start the map API to publish real listings"
+                : undefined
+            }
             onClick={() => setShowForm(true)}
           >
             Add a listing
@@ -105,6 +115,15 @@ export default function LandlordDashboard({
           </button>
         </div>
       </header>
+
+      {demoMode ? (
+        <p className="demo-mode-note">
+          <b>Demo mode.</b> You are signed in as the local demo owner and the
+          map API is not running, so these listings are the synthetic sample
+          pool. Start the backend (and sign in with a real owner account) to
+          publish and edit listings for real.
+        </p>
+      ) : null}
 
       <section className="my-listings">
         <div className="my-listings-head">
@@ -146,7 +165,10 @@ export default function LandlordDashboard({
                   {l.status !== "available" && (
                     <button
                       type="button"
-                      disabled={busyId === l.id}
+                      disabled={busyId === l.id || demoMode}
+                      title={
+                        demoMode ? "Demo mode — listings are read-only" : undefined
+                      }
                       onClick={() =>
                         act(l.id, () => setListingStatus(l.id, "available"))
                       }
@@ -157,7 +179,10 @@ export default function LandlordDashboard({
                   {l.status === "available" && (
                     <button
                       type="button"
-                      disabled={busyId === l.id}
+                      disabled={busyId === l.id || demoMode}
+                      title={
+                        demoMode ? "Demo mode — listings are read-only" : undefined
+                      }
                       onClick={() =>
                         act(l.id, () => setListingStatus(l.id, "rented"))
                       }
@@ -169,7 +194,10 @@ export default function LandlordDashboard({
                     <button
                       type="button"
                       className="danger"
-                      disabled={busyId === l.id}
+                      disabled={busyId === l.id || demoMode}
+                      title={
+                        demoMode ? "Demo mode — listings are read-only" : undefined
+                      }
                       onClick={() => {
                         if (window.confirm(`Remove “${l.title}” from the map?`))
                           void act(l.id, () => removeListing(l.id))

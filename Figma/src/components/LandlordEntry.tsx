@@ -10,12 +10,13 @@ import {
 import { getSupabase, isSupabaseConfigured } from "../lib/supabase"
 
 /**
- * Account created by `npm run seed:listings` — owns the 50 sample Hong Kong listings.
- * The one-click button only shows in dev, or when VITE_SHOW_DEMO_OWNER=true (judging),
- * because anyone could otherwise edit the sample listings on a public site.
+ * The demo owner. The one-click button only shows in dev, or when
+ * VITE_SHOW_DEMO_OWNER=true (judging), because on a public site it would let
+ * anyone read the sample listings. It signs in LOCALLY — no Supabase account
+ * and no network — so it works on a machine with no backend at all; see
+ * `signInAsDemoOwner` below and `isDemoOwnerSession` in lib/landlordApi.
  */
 const DEMO_EMAIL = "testing@rentmate.local"
-const DEMO_PASSWORD = "rentmate-testing-demo"
 const SHOW_DEMO_OWNER =
   import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_OWNER === "true"
 
@@ -97,6 +98,24 @@ export default function LandlordEntry({
     void authenticate(email.trim(), password, name.trim(), mode)
   }
 
+  /**
+   * Local-only demo sign-in: no Supabase account, no network round-trip.
+   *
+   * This is the debug path the owner asked for — with no backend running
+   * (and possibly no Supabase env at all) the real sign-in cannot succeed,
+   * so this writes a landlord session straight into localStorage. The
+   * dashboard detects it (demo email, no Supabase session) and reads the
+   * synthetic listing pool instead of the map API.
+   */
+  function signInAsDemoOwner() {
+    setMessage(null)
+    setUserRole("landlord")
+    setDisplayName("testing")
+    setStoredEmail(DEMO_EMAIL)
+    setOnboardedComplete()
+    onComplete()
+  }
+
   return (
     <main className="flow-shell">
       <button type="button" className="back-button" onClick={onBack}>
@@ -138,7 +157,8 @@ export default function LandlordEntry({
 
           {!configured && (
             <p className="field-message error">
-              Supabase env vars are missing, so owner sign-in is unavailable.
+              Supabase env vars are missing, so owner sign-in is unavailable —
+              the demo owner button below still works without a backend.
             </p>
           )}
 
@@ -210,14 +230,10 @@ export default function LandlordEntry({
             <button
               type="button"
               className="outline-button"
-              disabled={busy || !configured}
-              onClick={() => {
-                setEmail(DEMO_EMAIL)
-                setPassword(DEMO_PASSWORD)
-                void authenticate(DEMO_EMAIL, DEMO_PASSWORD, "testing", "signin")
-              }}
+              disabled={busy}
+              onClick={signInAsDemoOwner}
             >
-              Try the demo owner “testing”
+              Try the demo owner “testing” — no backend needed
             </button>
           )}
         </form>

@@ -1,5 +1,14 @@
 import { mapApiUrl } from "./api-base"
 import { getSupabase } from "./supabase"
+import { getStoredEmail } from "./demo-session"
+import { demoOwnListings } from "./demoListings"
+
+/**
+ * The local demo owner. On a machine with no Supabase env this is the only
+ * owner that can sign in, and it signs in *locally* — no auth round-trip.
+ * The dashboard detects that state and reads the synthetic listing pool.
+ */
+export const DEMO_OWNER_EMAIL = "testing@rentmate.local"
 
 export type OwnListing = {
   id: string
@@ -68,9 +77,48 @@ export function registerAsLandlord(displayName: string) {
   })
 }
 
+async function hasSupabaseSession(): Promise<boolean> {
+  const sb = getSupabase()
+  if (!sb) return false
+  const { data } = await sb.auth.getSession()
+  return Boolean(data.session)
+}
+
+/**
+ * True when the signed-in owner is the demo account with no Supabase session
+ * behind it — exactly what the one-click demo login on /landlord-entry
+ * creates. In that state there is no backend to talk to, so reads fall back
+ * to the synthetic pool and the UI refuses writes instead of failing.
+ *
+ * The check is on the SESSION, not the client: a real sign-in with the demo
+ * account (Supabase env present, session live) still uses the live API.
+ */
+export async function isDemoOwnerSession(): Promise<boolean> {
+  return getStoredEmail() === DEMO_OWNER_EMAIL && !(await hasSupabaseSession())
+}
+
+export async function fetchOwnListingsResult(): Promise<{
+  listings: OwnListing[]
+  /** "demo" = synthetic pool, because there is no live session to read from. */
+  source: "live" | "demo"
+}> {
+  if (await isDemoOwnerSession()) {
+    return { listings: demoOwnListings(), source: "demo" }
+  }
+  try {
+    const r = await request<{ listings: OwnListing[] }>("/api/landlord/listings")
+    return { listings: r.listings, source: "live" }
+  } catch (e) {
+    // A missing/expired session is a genuine auth failure — rethrow so the
+    // caller can sign the user out. Anything else (map API down, proxy
+    // refused, 404 on a static host) keeps the demo running on the pool.
+    if (e instanceof Error && /sign in|session/i.test(e.message)) throw e
+    return { listings: demoOwnListings(), source: "demo" }
+  }
+}
+
 export async function fetchOwnListings(): Promise<OwnListing[]> {
-  const r = await request<{ listings: OwnListing[] }>("/api/landlord/listings")
-  return r.listings
+  return (await fetchOwnListingsResult()).listings
 }
 
 export function createListing(input: NewListingInput) {

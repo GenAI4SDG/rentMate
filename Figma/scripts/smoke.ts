@@ -29,6 +29,12 @@ import {
   unproject,
 } from "../src/lib/listings"
 import {
+  DEMO_LISTING_FEATURES,
+  demoGeocode,
+  demoListingsInBbox,
+  demoOwnListings,
+} from "../src/lib/demoListings"
+import {
   TARGET_AREA_OPTIONS,
   flatSizeWarningForHome,
   filterReasons,
@@ -153,6 +159,62 @@ check("listingFromRow rebuilds details", fromDb.details === sample.details, { a:
 check("listingFromRow rebuilds the image url", fromDb.image === sample.image, { a: fromDb.image, b: sample.image })
 check("listingFromRow rebuilds the same walkthrough", JSON.stringify(fromDb.rooms) === JSON.stringify(sample.rooms))
 check("listingFromRow keeps the tips", JSON.stringify(fromDb.tips) === JSON.stringify(sample.tips))
+
+// --- offline map fallback ---------------------------------------------------
+// The student map reads the map API (backend/server, port 3001). When it is
+// down — a plain `vite dev`, or a static deploy with no VITE_MAP_API_URL —
+// lib/listingsApi falls back to this pool so the map still shows pins. The
+// fallback must return the pool in the map API's exact shape, filtered the
+// way the backend's SQL filters it.
+check("demo pool covers every local listing", DEMO_LISTING_FEATURES.length === LISTINGS.length, DEMO_LISTING_FEATURES.length)
+const badGeo = DEMO_LISTING_FEATURES.filter((f) => {
+  const [lng, lat] = f.geometry.coordinates
+  return !(lat > 22.2 && lat < 22.55 && lng > 113.9 && lng < 114.35)
+})
+check("every demo pin sits inside Hong Kong", badGeo.length === 0, badGeo.slice(0, 2).map((f) => f.properties.title))
+check("demo features carry the map API's property shape", DEMO_LISTING_FEATURES.every((f) =>
+  f.type === "Feature"
+  && typeof f.properties.id === "string"
+  && f.properties.price > 0
+  && f.properties.status === "available"))
+
+// Filters mirror backend/server/src/data/query-listings.ts: bedrooms is a
+// floor (gte), price is inclusive on both ends, bbox is [west, south, east, north].
+const HK_WIDE: [number, number, number, number] = [113.9, 22.2, 114.35, 22.55]
+const wide = demoListingsInBbox(HK_WIDE, {})
+check("a Hong-Kong-wide bbox returns the whole pool", wide.length === LISTINGS.length, wide.length)
+const twoBed = demoListingsInBbox(HK_WIDE, { bedrooms: 2 })
+check("bedrooms is a floor, not an equals", twoBed.length > 0 && twoBed.every((f) => f.properties.bedrooms >= 2), twoBed.length)
+const cheap = demoListingsInBbox(HK_WIDE, { maxPrice: 10000 })
+check("maxPrice filters inclusively", cheap.length > 0 && cheap.every((f) => f.properties.price <= 10000), cheap.length)
+const mongKokBox: [number, number, number, number] = [114.16, 22.31, 114.18, 22.33]
+const nearMongKok = demoListingsInBbox(mongKokBox, {})
+// The real invariant: every returned pin sits inside the viewport. Districts
+// are labels, not containers — a jittered Hung Hom pin legitimately shows up
+// in a Mong Kok viewport, exactly as it would against the live API.
+check("bbox restricts to the viewport", nearMongKok.length > 0 && nearMongKok.every((f) => {
+  const [lng, lat] = f.geometry.coordinates
+  return lng >= mongKokBox[0] && lng <= mongKokBox[2] && lat >= mongKokBox[1] && lat <= mongKokBox[3]
+}), nearMongKok.map((f) => f.properties.district))
+// Tight around the Mong Kok centroid: no neighbouring district's jitter can
+// reach in, so only Mong Kok pins can answer.
+const tightBox: [number, number, number, number] = [114.16, 22.312, 114.176, 22.323]
+const tight = demoListingsInBbox(tightBox, {})
+check("a box around one district returns that district's pins", tight.length > 0 && tight.every((f) => f.properties.district === "Mong Kok"), tight.map((f) => f.properties.district))
+
+// Geocode fallback: districts, aliases and campus names fly somewhere real;
+// an unknown address fails honestly instead of flying to the wrong place.
+const shaTin = demoGeocode("Sha Tin")
+check("geocode finds a district by name", shaTin !== null && Math.abs(shaTin.lat - 22.382) < 0.01, shaTin)
+check("geocode matches a misspelling alias", demoGeocode("mongkok")?.displayName.includes("Mong Kok") ?? false)
+check("geocode matches a campus name", (demoGeocode("CUHK")?.displayName ?? "").includes("Sha Tin"))
+check("geocode returns null for an unknown address", demoGeocode("42 Harbour Road") === null)
+
+// --- owner dashboard fallback ------------------------------------------------
+const own = demoOwnListings()
+check("demo owner listings are non-empty", own.length > 0, own.length)
+check("demo owner listings have unique ids", new Set(own.map((l) => l.id)).size === own.length)
+check("demo owner listings have a valid status", own.every((l) => l.status === "available" || l.status === "rented" || l.status === "hidden"))
 
 // --- flat size is a warning, never a gate ----------------------------------
 check("flatSizeWarningForHome flags a small flat", typeof flatSizeWarningForHome(profile, 400) === "string" || flatSizeWarningForHome(profile, 400) === null)

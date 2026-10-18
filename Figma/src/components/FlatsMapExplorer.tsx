@@ -4,6 +4,7 @@ import {
   fetchListingsBbox,
   fetchNearby,
   geocodeQuery,
+  resetMapApiStatus,
   type ListingFeature,
 } from "../lib/listingsApi"
 import { priceContext } from "../lib/priceContext"
@@ -23,16 +24,19 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
   const [mobileMap, setMobileMap] = useState(false)
   const [maxPrice, setMaxPrice] = useState<number | undefined>(20000)
   const [bedrooms, setBedrooms] = useState<number | undefined>(undefined)
+  const [demoMode, setDemoMode] = useState(false)
   const [nearby, setNearby] = useState<
     Array<{ type: string; name: string; distanceMeters: number }>
   >([])
   const abortRef = useRef<AbortController | null>(null)
+  const lastBboxRef = useRef<[number, number, number, number] | null>(null)
 
   const loadBbox = useCallback(
     async (bbox: [number, number, number, number]) => {
       abortRef.current?.abort()
       const ac = new AbortController()
       abortRef.current = ac
+      lastBboxRef.current = bbox
       setLoading(true)
       setError(null)
       try {
@@ -42,6 +46,7 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
           ac.signal,
         )
         setFeatures(data.features)
+        setDemoMode(data.source === "demo")
         if (data.truncated) {
           setError("Showing first 500 results — zoom in to narrow.")
         }
@@ -51,12 +56,21 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
           "Could not load listings. Is the map API running on port 3001?",
         )
         setFeatures([])
+        setDemoMode(false)
       } finally {
         setLoading(false)
       }
     },
     [maxPrice, bedrooms],
   )
+
+  /** Re-probe the live map API (e.g. after starting the backend), then reload. */
+  function retryLiveMap() {
+    resetMapApiStatus()
+    const bbox = lastBboxRef.current
+    if (bbox) void loadBbox(bbox)
+    else setDemoMode(false)
+  }
 
   useEffect(() => {
     if (!selected) {
@@ -97,12 +111,23 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
         <div>
           <p className="section-kicker">Live map · OpenStreetMap</p>
           <h1>Find available homes in Hong Kong.</h1>
+          {demoMode ? (
+            <button
+              type="button"
+              className="demo-source-badge"
+              onClick={retryLiveMap}
+              title="The map API (port 3001) is not reachable, so these pins are the synthetic demo pool. Click to try the live API again."
+            >
+              <span className="demo-dot" aria-hidden="true" />
+              Demo listings · map API offline — retry
+            </button>
+          ) : null}
         </div>
         <form className="search-box" onSubmit={handleSearchSubmit}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search address or area (via backend geocode)"
+            placeholder="Search district or address"
             aria-label="Search address"
           />
           <button type="submit">Go</button>
