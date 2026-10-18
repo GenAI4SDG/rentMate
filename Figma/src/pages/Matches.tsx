@@ -8,6 +8,15 @@ import RentChatbot from "../components/RentChatbot"
 import { getQuizAnswers } from "../lib/demo-session"
 import { matches, flats, roomViews } from "../appData"
 
+// Pre-merge behaviour: the conversation list previews the last message
+// actually sent in the thread, truncated — not a canned line that can drift
+// from the conversation underneath it. Only the first connection has a seeded
+// thread; everyone else shows the "say hello" prompt.
+function threadPreview(lastText: string | undefined): string {
+  if (!lastText) return "You're connected — say hello"
+  return lastText.length > 42 ? `${lastText.slice(0, 42)}…` : lastText
+}
+
 function MatchCard({
   match,
   onOpen,
@@ -292,9 +301,11 @@ export default function Matches({
                 <span>
                   <b>{match.name}</b>
                   <small>
-                    {index === 0
-                      ? "Want to shortlist a few flats..."
-                      : "You’re connected — say hello"}
+                    {threadPreview(
+                      index === 0
+                        ? messages[messages.length - 1]?.text
+                        : undefined,
+                    )}
                   </small>
                 </span>
                 {index === 0 && <i />}

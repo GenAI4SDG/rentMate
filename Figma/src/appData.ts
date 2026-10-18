@@ -6,10 +6,19 @@ export type Screen =
   | "landlord-entry"
   | "landlord-dashboard"
 
+import type { QuizSection } from "./lib/quiz"
+
 export type Question = {
   eyebrow: string
   title: string
   hint: string
+  /**
+   * Presentation grouping for the quiz aside (`quiz-section-note`), reusing
+   * the section vocabulary of lib/quiz.ts — the full 20-question engine that
+   * is NOT wired into the app yet (see README F2). It is chrome only: nothing
+   * scores, filters or stores this field.
+   */
+  section?: QuizSection
   options: { title: string; detail?: string; tone?: string }[]
 }
 
@@ -21,6 +30,7 @@ export const questions: Question[] = [
     eyebrow: "Home rhythms",
     title: "Your week has been full-on. What does home look like tonight?",
     hint: "Choose the evening that feels most restorative to you.",
+    section: "lifestyle",
     options: [
       {
         title: "A quiet night in",
@@ -45,6 +55,7 @@ export const questions: Question[] = [
     title:
       "You’re on a three-hour train ride. Which seat do you instinctively take?",
     hint: "There is no right answer — go with your first instinct.",
+    section: "lifestyle",
     options: [
       {
         title: "Next to a quiet reader",
@@ -69,6 +80,7 @@ export const questions: Question[] = [
     title:
       "Your flatmate accidentally breaks something sentimental. What comes first?",
     hint: "Pick the response closest to your genuine first thought.",
+    section: "lifestyle",
     options: [
       {
         title: "Let’s find a practical fix",
@@ -92,6 +104,7 @@ export const questions: Question[] = [
     eyebrow: "Daily routine",
     title: "Which household rhythm feels most like yours?",
     hint: "Think about an ordinary weekday rather than your ideal one.",
+    section: "lifestyle",
     options: [
       { title: "Early bird", detail: "Up early, winding down by 11." },
       { title: "Night owl", detail: "Most productive after sunset." },
@@ -110,6 +123,7 @@ export const questions: Question[] = [
     title:
       "Scientists named a new colour after your personality. Which swatch is yours?",
     hint: "Choose the one that feels instinctively like you.",
+    section: "thinking",
     options: [
       { title: "Warm glowing terracotta", tone: "#c96b48" },
       { title: "Crisp, cool sky blue", tone: "#8eafc2" },
@@ -121,6 +135,7 @@ export const questions: Question[] = [
     eyebrow: "Shared space",
     title: "How do you prefer to handle kitchen supplies?",
     hint: "This helps prevent the tiny frictions that add up over time.",
+    section: "lifestyle",
     options: [
       { title: "Everything shared", detail: "No labels needed." },
       {
@@ -135,6 +150,7 @@ export const questions: Question[] = [
     eyebrow: "Match preferences",
     title: "Who would you feel comfortable sharing a home with?",
     hint: "You can update this privately in your profile at any time.",
+    section: "nonneg",
     options: [
       { title: "Anyone", detail: "Compatibility matters most to me." },
       { title: "Women only" },

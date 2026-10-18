@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import HouseMap from "./HouseMap"
+import Icon from "./ui/Icon"
 import {
   fetchListingsBbox,
   fetchNearby,
@@ -8,12 +9,51 @@ import {
   type ListingFeature,
 } from "../lib/listingsApi"
 import { priceContext } from "../lib/priceContext"
+import { STATUS_LABEL, sharePerPerson, type ListingStatus } from "../lib/listings"
 
 type Props = {
   onOpenLegacyTour?: (listing: ListingFeature) => void
+  /**
+   * Household size the "about $X each" line divides by.
+   *
+   * The pre-merge app derived this from the quiz profile
+   * (`profile?.household_size ?? 2`, lib/quiz.ts). The quiz that is wired
+   * today does not capture household size, so this defaults to 2 — the same
+   * demo default. It is arithmetic on the flat ("what this flat works out to
+   * per person if two people share it"), not a claim about the user.
+   */
+  people?: number
 }
 
-export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
+/**
+ * Saved pins for the OSM pool. Separate from lib/personalStore on purpose:
+ * that store is keyed by the numeric ids of the curated demo pool
+ * (saved/status/attached/viewings for listings 1..N and curated match ids),
+ * while pins here carry the map API's string ids. Mixing the two would let a
+ * save on one surface silently fail on the other. This is a local, per-device
+ * save — no Supabase mirror, no conversation attachment — and says so by not
+ * pretending to be the full personal store.
+ */
+const SAVED_KEY = "rentmate.osm-saved.v1"
+
+function loadSaved(): string[] {
+  try {
+    const raw = localStorage.getItem(SAVED_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string")
+      : []
+  } catch {
+    return []
+  }
+}
+
+/** The map API returns the listing's own status; anything unexpected is not "available". */
+function statusOf(status: string): ListingStatus {
+  return status === "viewing" || status === "taken" ? status : "available"
+}
+
+export default function FlatsMapExplorer({ onOpenLegacyTour, people = 2 }: Props) {
   const [features, setFeatures] = useState<ListingFeature[]>([])
   const [selected, setSelected] = useState<ListingFeature | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -25,11 +65,28 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
   const [maxPrice, setMaxPrice] = useState<number | undefined>(20000)
   const [bedrooms, setBedrooms] = useState<number | undefined>(undefined)
   const [demoMode, setDemoMode] = useState(false)
+  const [savedIds, setSavedIds] = useState<string[]>(loadSaved)
   const [nearby, setNearby] = useState<
     Array<{ type: string; name: string; distanceMeters: number }>
   >([])
   const abortRef = useRef<AbortController | null>(null)
   const lastBboxRef = useRef<[number, number, number, number] | null>(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SAVED_KEY, JSON.stringify(savedIds))
+    } catch {
+      /* A blocked or full storage quota must never break the map. */
+    }
+  }, [savedIds])
+
+  function toggleSaved(id: string) {
+    setSavedIds((current) =>
+      current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id],
+    )
+  }
 
   const loadBbox = useCallback(
     async (bbox: [number, number, number, number]) => {
@@ -175,33 +232,116 @@ export default function FlatsMapExplorer({ onOpenLegacyTour }: Props) {
             <span>Price ↑</span>
           </div>
           <div className="result-scroll">
+            {/* Cards, not text rows. The pre-merge card markup (result-row /
+                result-open / result-copy / result-foot) is what index.css is
+                written for — the 14 Oct note above `.result-scroll` records
+                that the old bare-button rules were deliberately deleted. */}
             {sorted.map((f) => {
               const p = f.properties
+              const status = statusOf(p.status)
+              const saved = savedIds.includes(p.id)
               return (
-                <button
-                  type="button"
+                <div
                   key={p.id}
-                  className={selected?.properties.id === p.id ? "active" : ""}
+                  className={`result-row ${
+                    selected?.properties.id === p.id ? "active" : ""
+                  }`}
                   onMouseEnter={() => setHoveredId(p.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => setSelected(f)}
                 >
-                  <span>
-                    <small>{p.district}</small>
-                    <b>{p.title}</b>
-                    <strong>
-                      HK${p.price.toLocaleString()} <em>/ mo</em>
-                    </strong>
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="result-open"
+                    onClick={() => setSelected(f)}
+                  >
+                    {p.thumbnail ? (
+                      <img src={p.thumbnail} alt="" />
+                    ) : (
+                      <span className="result-thumb-empty" aria-hidden="true">
+                        <Icon name="home" size={18} />
+                      </span>
+                    )}
+                    <span className="result-copy">
+                      <small className="result-area">{p.district}</small>
+                      <b>{p.title}</b>
+                      <i>
+                        {p.bedrooms} bed · {p.bathrooms} bath
+                      </i>
+                      <strong>
+                        HK${p.price.toLocaleString()}{" "}
+                        <em>/ mo whole flat</em>
+                      </strong>
+                      <em className="share-line">
+                        about $
+                        {sharePerPerson(p.price, people).toLocaleString(
+                          "en-US",
+                        )}{" "}
+                        each for {people}
+                      </em>
+                    </span>
+                  </button>
+                  <div className="result-foot">
+                    <span className={`status-pill ${status}`}>
+                      {STATUS_LABEL[status]}
+                    </span>
+                    {onOpenLegacyTour && (
+                      <span className="chip-mini">3D walkthrough</span>
+                    )}
+                    <div className="result-actions">
+                      <button
+                        type="button"
+                        className={`save-mini ${saved ? "saved" : ""}`}
+                        onClick={() => toggleSaved(p.id)}
+                        aria-label={saved ? "Remove from saved" : "Save this home"}
+                        title={saved ? "Remove from saved" : "Save this home"}
+                      >
+                        <Icon name="heart" size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )
             })}
+            {sorted.length === 0 && !loading && (
+              <p className="empty-shortlist">
+                Nothing in view — pan the map or widen the filters.
+              </p>
+            )}
           </div>
         </aside>
 
         <article className="map-property-detail">
           {selected ? (
             <>
+              <div className="detail-image">
+                {selected.properties.thumbnail ? (
+                  <img
+                    src={selected.properties.thumbnail}
+                    alt={selected.properties.title}
+                  />
+                ) : (
+                  <span className="detail-image-empty" aria-hidden="true">
+                    <Icon name="home" size={26} />
+                  </span>
+                )}
+                <span>
+                  {demoMode ? "Demo listing" : selected.properties.district}
+                </span>
+                <button
+                  type="button"
+                  className={
+                    savedIds.includes(selected.properties.id) ? "saved" : ""
+                  }
+                  onClick={() => toggleSaved(selected.properties.id)}
+                  aria-label={
+                    savedIds.includes(selected.properties.id)
+                      ? "Remove from saved"
+                      : "Save this home"
+                  }
+                >
+                  <Icon name="heart" size={16} />
+                </button>
+              </div>
               <div className="detail-copy">
                 <span className="detail-area">{selected.properties.district}</span>
                 <h2>{selected.properties.title}</h2>

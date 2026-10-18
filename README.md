@@ -51,7 +51,7 @@ touching the UI — the three endpoints are listed in
 |---|---|
 | `/` | Landing. Student CTA leads; the owner CTA is secondary. |
 | `/verify` | Email gate — 12 institutions / 41 domains, exact match. No password, no OTP, no session. |
-| `/quiz` | **20 questions across 17 pages** → profile: six lifestyle scalars, MBTI inferred from behaviour (never shown as a code), budget, areas. |
+| `/quiz` | 7-question single-choice flow (from `appData.ts`) → answers feed the settling plan and the compatibility narrative. The full 20-question / 17-page engine — sections, multi-select, free text — exists smoke-tested in `lib/quiz.ts` but is **not wired into the app** (known gap, see F2). |
 | `/matches` | Hook deck (one real shared detail per match, not a ranked grid) → chat with a **compatibility narrative** → **Find a flat** (Leaflet/OSM map + district price context) → **My plan** settling-in checklist. `demo@` / `admin@` local parts unlock the curated demo cast / review queue. |
 
 **Landlords / flat owners** (secondary path — needs the backend to be *live*, or runs read-only):
@@ -148,7 +148,7 @@ Legend: ✅ demo-ready · 🟡 partial / prototype · ⬜ not wired in app yet.
 | ID | Feature | Status | Notes |
 |----|---------|--------|-------|
 | F1 | Student verification (university email) | 🟡 | Domain gate + email-as-account-key; **not** mailbox proof, and nothing is stored to attest it |
-| F2 | Lifestyle + housing quiz | ✅ | **20 questions / 17 pages** in `lib/quiz.ts` + `pages/Quiz.tsx` |
+| F2 | Lifestyle + housing quiz | 🟡 | 7 questions wired in `pages/Quiz.tsx` (from `appData.ts`). `lib/quiz.ts` holds the full 20-question / 17-page engine — sections, multi-select, free text, profile round-trip, all smoke-tested — but **nothing imports it**: wiring it up is a known gap, not a shipped feature. |
 | F3 | Roommate matching + compatibility narrative | 🟡 | Seeded profiles; deterministic score contract; narrative is a rule-based placeholder, LLM-swap ready |
 | F4 | Listing layer + neighbourhood transparency | 🟡 | Real map listings when the API runs, **offline demo fallback** when it doesn't; nearby POIs optional; district price context vs. the loaded pool; mock 3D tour |
 | F4+ | Landlord list & manage on map | ✅ | Supabase Auth, create / mark rented / relist / remove, ownership enforced server-side; demo owner signs in locally |
